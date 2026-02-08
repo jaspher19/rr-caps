@@ -10,13 +10,12 @@ from datetime import datetime
 app = Flask(__name__)
 
 # --- SECURE CONFIGURATION ---
-# In production, these should be set as Environment Variables on Render/PythonAnywhere
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_ultra_secret_key")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") # Change this!
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=False, # Set to True if using HTTPS (SSL)
+    SESSION_COOKIE_SECURE=False, 
 )
 
 # --- DIRECTORY CONFIGURATION ---
@@ -33,7 +32,6 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = SHOP_EMAIL
-# Fetching password from environment for security
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern') 
 app.config['MAIL_DEFAULT_SENDER'] = SHOP_EMAIL
 
@@ -80,49 +78,52 @@ def order_history():
 
 @app.route("/admin")
 def admin():
-    # Basic Security: Access via /admin?key=STREET_BOSS_2026
     key = request.args.get('key')
     if key != ADMIN_PASSWORD:
         return "Unauthorized Access", 403
-        
     products = load_products()
     return render_template("admin.html", products=products, admin_key=key)
 
-@app.route("/admin/add", methods=["POST"])
+@app.route("/admin/add", methods=["GET", "POST"])
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
-    name = request.form.get("name")
-    price = request.form.get("price", 0)
-    category = request.form.get("category")
-    description = request.form.get("description")
-    badge = request.form.get("badge")
-    
-    try: price = int(price)
-    except: price = 0
-    
-    file = request.files.get("photo")
-    image_path = "images/products/default.jpg" 
-    
-    if file and file.filename != '':
-        filename = secure_filename(file.filename)
-        unique_name = f"{int(time.time())}_{filename}"
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
-        image_path = f"images/products/{unique_name}"
+    if request.method == "POST":
+        name = request.form.get("name")
+        price = request.form.get("price", 0)
+        category = request.form.get("category")
+        description = request.form.get("description")
+        badge = request.form.get("badge")
+        
+        try: price = int(price)
+        except: price = 0
+        
+        file = request.files.get("photo")
+        image_path = "images/products/default.jpg" 
+        
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            unique_name = f"{int(time.time())}_{filename}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+            image_path = f"images/products/{unique_name}"
 
-    products = load_products()
-    products.append({
-        "id": int(time.time()), 
-        "name": name,
-        "price": price,
-        "category": category,
-        "description": description,
-        "badge": badge,
-        "image": image_path
-    })
-    save_products(products)
-    return redirect(url_for('admin', key=key, success=1))
+        products = load_products()
+        products.append({
+            "id": int(time.time()), 
+            "name": name,
+            "price": price,
+            "category": category,
+            "description": description,
+            "badge": badge,
+            "image": image_path
+        })
+        save_products(products)
+        # Redirect back to admin dashboard with the key
+        return redirect(url_for('admin', key=key, success=1))
+    
+    # If GET request, show the add product page
+    return render_template("admin_add.html", admin_key=key)
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
@@ -257,5 +258,4 @@ def checkout():
     return render_template("success.html", order_id=order_id, total=grand_total)
 
 if __name__ == "__main__":
-    # Ensure debug is False in a true live production environment
     app.run(debug=True)
