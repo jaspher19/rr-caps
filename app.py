@@ -117,20 +117,22 @@ def add_product():
             "image": image_path
         })
         save_products(products)
+        # We pass the key back during redirect to keep the session alive
         return redirect(url_for('admin', key=key, success=1))
     
     return render_template("admin_add.html", admin_key=key)
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST", "GET"])
 def delete_product(product_id):
-    # Fix: Explicitly check for key in URL
+    # This checks the ?key= in the URL for the delete action
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
     products = load_products()
     products = [p for p in products if p['id'] != product_id]
     save_products(products)
-    # Fix: Redirect back with the key
+    
+    # Redirect back to admin with the key so the dashboard remains authorized
     return redirect(url_for('admin', key=key, deleted=1))
 
 @app.route("/admin/clear-store", methods=["POST"])

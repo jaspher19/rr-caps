@@ -8,18 +8,20 @@
     <style>
         body { background-color: #000; color: #fff; font-family: 'Arial', sans-serif; padding: 40px; }
         .form-container { max-width: 500px; margin: auto; background: #111; padding: 30px; border: 1px solid #333; border-radius: 8px; }
-        input, textarea, select { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; }
-        button { width: 100%; padding: 15px; background: #fff; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; }
+        label { font-size: 0.85em; color: #aaa; margin-top: 10px; display: block; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #fff; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; margin-top: 20px; }
         button:hover { background: #ccc; }
-        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 0.9em; }
+        .back-link:hover { color: #fff; }
     </style>
 </head>
 <body>
 
 <div class="form-container">
     <h2>Add New Cap</h2>
-    <p style="color: #888; font-size: 0.9em;">Fill in the details below to add a product to the shop.</p>
-    <hr style="border: 0.5px solid #333;">
+    <p style="color: #888; font-size: 0.9em;">New products will appear live on the shop immediately.</p>
+    <hr style="border: 0.5px solid #333; margin-bottom: 20px;">
 
     <form action="/admin/add?key={{ admin_key }}" method="POST" enctype="multipart/form-data">
         
@@ -34,14 +36,14 @@
             <option value="Snapback">Snapback</option>
             <option value="Trucker">Trucker</option>
             <option value="Beanie">Beanie</option>
-            <option value="Limited">Limited Edition</option>
+            <option value="Limited Edition">Limited Edition</option>
         </select>
 
         <label>Description</label>
-        <textarea name="description" rows="3" placeholder="Describe the material or fit..."></textarea>
+        <textarea name="description" rows="3" placeholder="Describe the material, fit, or color..."></textarea>
 
         <label>Badge (Optional)</label>
-        <input type="text" name="badge" placeholder="e.g., New Arrival or 20% OFF">
+        <input type="text" name="badge" placeholder="e.g., NEW or 10% OFF">
 
         <label>Product Image</label>
         <input type="file" name="photo" accept="image/*" required>
@@ -49,7 +51,7 @@
         <button type="submit">UPLOAD PRODUCT</button>
     </form>
 
-    <a href="/admin?key={{ admin_key }}" class="back-link">← Cancel and Back</a>
+    <a href="/admin?key={{ admin_key }}" class="back-link">← Cancel and Back to Dashboard</a>
 </div>
 
 </body>
