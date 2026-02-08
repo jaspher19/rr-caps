@@ -119,7 +119,27 @@ def order_history():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     return render_template("orders.html", orders=load_orders(), admin_key=key)
 
-# --- CART & CHECKOUT ---
+# --- CART MANAGEMENT ---
+
+@app.route("/cart")
+def view_cart():
+    products = load_products()
+    cart_ids = session.get("cart", [])
+    
+    # Process the cart to group duplicates and calculate price
+    cart_items = []
+    total_price = 0
+    counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
+    
+    for pid, qty in counts.items():
+        for p in products:
+            if str(p["id"]) == pid:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+                
+    return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
 def add_to_cart():
@@ -128,10 +148,25 @@ def add_to_cart():
     session.modified = True
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
 
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    product_id = request.form.get("product_id")
+    if "cart" in session:
+        if product_id in session["cart"]:
+            session["cart"].remove(product_id)
+            session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    return redirect(url_for('view_cart'))
+
+# --- CHECKOUT ---
+
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
-        # 1. Capture Cart Data before clearing it
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
@@ -139,7 +174,6 @@ def checkout():
         checkout_items = []
         total_price = 0
         
-        # Identify which products are in the cart and count them
         counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
         for pid, qty in counts.items():
             for p in products:
@@ -149,13 +183,11 @@ def checkout():
                     checkout_items.append(item)
                     total_price += p["price"] * qty
         
-        # 2. Capture Form Data
         customer_email = request.form.get("email")
         customer_address = request.form.get("address", "N/A")
         customer_city = request.form.get("city", "N/A")
         order_id = f"RR-{random.randint(1000, 9999)}"
         
-        # 3. Save Order to JSON
         orders = load_orders()
         orders.append({
             "order_id": order_id, 
@@ -167,18 +199,15 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # 4. Email Notification
         msg = Message(subject=f"Order {order_id} Confirmed", 
                       sender=SHOP_EMAIL, 
                       recipients=[customer_email, SHOP_EMAIL])
         msg.body = f"Thank you for your order!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {customer_address}, {customer_city}"
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
-        # 5. Clear Cart
         session.pop("cart", None)
         session.modified = True
 
-        # 6. Pass data to success template
         return render_template("success.html", 
                                order_id=order_id, 
                                items=checkout_items, 

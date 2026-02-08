@@ -57,7 +57,7 @@
         {% for item in cart %}
         <div class="flex items-center justify-between group">
           <div class="flex items-center gap-6">
-            <div class="w-20 h-24 bg-[#111] flex items-center justify-center overflow-hidden rounded relative">
+            <div class="w-20 h-24 bg-[#111] flex items-center justify-center overflow-hidden rounded relative border border-white/5">
               <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.name }}" class="w-4/5 object-contain">
               
               {% if item.quantity > 1 %}
@@ -144,6 +144,7 @@
 
         if(form) {
             form.addEventListener('submit', function(e) {
+                // Only trigger loading state if form is valid
                 if (form.checkValidity()) {
                     btn.disabled = true;
                     btn.classList.add('opacity-50', 'cursor-not-allowed');
