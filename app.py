@@ -16,26 +16,32 @@ SHOP_EMAIL = 'jasphertampos5@gmail.com'
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# --- UPDATED EMAIL CONFIG (Port 587 Fix) ---
+# --- ULTRA STABLE EMAIL CONFIG ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,             # Standard for cloud apps
-    MAIL_USE_TLS=True,         # Must be True for 587
-    MAIL_USE_SSL=False,        # Must be False for 587
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USE_SSL=False,
     MAIL_USERNAME=SHOP_EMAIL,
+    # MUST BE A 16-CHARACTER GMAIL APP PASSWORD
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
-    MAIL_DEFAULT_SENDER=SHOP_EMAIL
+    MAIL_DEFAULT_SENDER=SHOP_EMAIL,
+    MAIL_ASCII_ATTACHMENTS=False
 )
 mail = Mail(app)
 
-# --- ASYNC EMAIL HELPER ---
+# --- ASYNC EMAIL HELPER WITH RETRY LOGIC ---
 def send_async_email(app, msg):
     with app.app_context():
-        try:
-            mail.send(msg)
-            print(">>> EMAIL SENT SUCCESSFULLY")
-        except Exception as e:
-            print(f">>> Background Mail Error: {e}")
+        for attempt in range(3):  # Try 3 times before giving up
+            try:
+                mail.send(msg)
+                print(f">>> EMAIL SENT SUCCESSFULLY ON ATTEMPT {attempt + 1}")
+                return 
+            except Exception as e:
+                print(f">>> Attempt {attempt + 1} failed: {e}")
+                time.sleep(2) # Wait 2 seconds before trying again
+        print(">>> ALL EMAIL ATTEMPTS FAILED.")
 
 # --- UTILS ---
 def load_products():
@@ -143,12 +149,14 @@ def checkout():
         customer_email = request.form.get("email")
         order_id = f"RR-{random.randint(1000, 9999)}"
         
-        # Save order
+        # Save order info locally
         save_order_to_history({
             "order_id": order_id, 
             "email": customer_email,
             "date": datetime.now().strftime("%b %d, %Y")
         })
+        
+        # Clear cart
         session.pop("cart", None)
         session.modified = True
 
@@ -160,7 +168,7 @@ def checkout():
         )
         msg.body = f"Thank you for your order! Your Order ID is {order_id}."
 
-        # Start Thread
+        # Start Async Thread
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         return render_template("success.html", order_id=order_id)
