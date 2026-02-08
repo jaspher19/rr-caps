@@ -43,7 +43,7 @@
   <div class="flex gap-8 mb-10">
     <a href="{{ url_for('home') }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">← Storefront</a>
     <span class="text-gray-800">|</span>
-    <a href="{{ url_for('order_history', key=admin_key) }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">Order History →</a>
+    <span class="text-[10px] uppercase tracking-[0.4em] text-gray-700 cursor-not-allowed">Order History (Locked)</span>
   </div>
 
   <div class="w-full max-w-5xl space-y-12">
@@ -133,9 +133,9 @@
             <h2 class="text-red-500 text-lg font-black uppercase tracking-tighter">Wipe Storefront</h2>
             <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Permanently remove all products from the catalog.</p>
         </div>
-        <form action="{{ url_for('clear_store', key=admin_key) }}" method="POST" onsubmit="return confirm('CRITICAL WARNING: This will delete ALL products. Proceed?');">
-            <button type="submit" class="bg-red-600 hover:bg-red-500 text-white py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all">
-                Execute Store Wipe
+        <form onsubmit="alert('Function temporarily disabled. Add the route to app.py first.'); return false;">
+            <button type="submit" class="bg-gray-800 text-gray-500 py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] cursor-not-allowed">
+                Wipe Unavailable
             </button>
         </form>
     </div>
