@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Bag | RCAPS4STREET</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    input::placeholder { color: #4b5563; }
+    
+    .loader {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #000;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body class="bg-[#0A0A0A] text-white min-h-screen flex flex-col">
+
+  <nav class="sticky top-0 z-50 flex justify-between items-center px-6 md:px-12 py-4 bg-black/90 backdrop-blur-md border-b border-white/5">
+    <a href="{{ url_for('home') }}" class="flex items-center gap-4 group">
+      <div class="relative w-10 h-10 overflow-hidden rounded-lg border border-white/10">
+        <img src="{{ url_for('static', filename='images/LOGOS/LOGO.jfif') }}" alt="Logo" class="w-full h-full object-cover">
+      </div>
+      <span class="text-xl font-extrabold tracking-tighter uppercase">RCAPS4 <span class="text-gray-500">STREET</span></span>
+    </a>
+    <a href="{{ url_for('home') }}" class="text-[10px] uppercase tracking-[0.2em] hover:text-gray-400 transition">Continue Shopping</a>
+  </nav>
+
+  <main class="flex-grow max-w-4xl mx-auto w-full px-6 py-20">
+    <div class="flex justify-between items-end mb-12 border-b border-white/10 pb-6">
+      <div>
+        <h1 class="text-4xl font-extrabold tracking-tighter uppercase">Your Bag</h1>
+        <p class="text-gray-500 text-sm">({{ cart|length if cart else 0 }} Unique Items)</p>
+      </div>
+      
+      {% if cart %}
+      <form action="/empty-cart" method="POST" onsubmit="return confirm('Are you sure you want to empty your bag?');">
+        <button type="submit" class="text-[10px] text-gray-500 hover:text-white uppercase tracking-[0.2em] transition border border-white/10 px-4 py-2 rounded">
+          Empty Bag
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if cart %}
+      <div class="space-y-8 mb-16">
+        {% for item in cart %}
+        <div class="flex items-center justify-between group">
+          <div class="flex items-center gap-6">
+            <div class="w-20 h-24 bg-[#111] flex items-center justify-center overflow-hidden rounded relative">
+              <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.name }}" class="w-4/5 object-contain">
+              
+              {% if item.quantity > 1 %}
+              <div class="absolute top-1 right-1 bg-white text-black text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg">
+                {{ item.quantity }}X
+              </div>
+              {% endif %}
+            </div>
+
+            <div>
+              <h2 class="text-sm font-bold tracking-wide uppercase">{{ item.name }}</h2>
+              
+              <div class="flex items-center gap-4 mt-2">
+                <span class="text-[10px] text-gray-500 uppercase font-semibold">Qty: {{ item.quantity }}</span>
+                
+                <form action="/remove-from-cart" method="POST">
+                  <input type="hidden" name="product_id" value="{{ item.id }}">
+                  <button type="submit" class="text-[9px] text-red-500/60 hover:text-red-500 uppercase tracking-widest transition">
+                    Remove One
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+          
+          <p class="text-sm font-light">₱{{ item.price * item.quantity }}</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <form id="checkout-form" action="{{ url_for('checkout') }}" method="POST" class="space-y-10">
+        <div class="border-t border-white/10 pt-10">
+          <h3 class="text-[10px] tracking-[0.3em] uppercase mb-8 text-white font-bold">Shipping Details</h3>
+          
+          <div class="space-y-4">
+            <input type="email" name="email" id="email" placeholder="EMAIL ADDRESS" required 
+                   class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+            
+            <input type="text" name="address" id="address" placeholder="STREET ADDRESS / HOUSE NUMBER" required 
+                   class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <input type="text" name="city" id="city" placeholder="CITY" required 
+                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+                <input type="text" name="zip" id="zip" placeholder="ZIP CODE" required 
+                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-6 border-t border-white/10">
+          <div class="flex justify-between text-sm tracking-widest uppercase mb-4 text-gray-400">
+            <span>Subtotal</span>
+            <span class="text-white">₱{{ total_price }}</span>
+          </div>
+          <div class="flex justify-between text-sm tracking-widest uppercase mb-10 text-gray-400">
+            <span>Shipping</span>
+            <span class="text-green-500">FREE</span>
+          </div>
+
+          <button type="submit" id="submit-btn" class="w-full bg-white text-black py-5 text-xs font-bold uppercase tracking-[0.3em] hover:bg-gray-200 transition active:scale-[0.98] flex items-center justify-center">
+            <span id="btn-text">Complete Purchase</span>
+          </button>
+        </div>
+      </form>
+
+    {% else %}
+      <div class="text-center py-20">
+        <p class="text-gray-500 tracking-widest uppercase text-sm mb-8">Your cart is currently empty.</p>
+        <a href="{{ url_for('home') }}" class="inline-block px-10 py-4 border border-white/20 text-[10px] uppercase tracking-[0.2em] hover:bg-white hover:text-black transition">Return to Collections</a>
+      </div>
+    {% endif %}
+  </main>
+
+  <footer class="py-10 text-center border-t border-white/5 mt-auto">
+    <p class="text-[9px] text-gray-700 tracking-[0.5em] uppercase">&copy; 2026 RCAPS4STREET INTERACTIVE</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('checkout-form');
+        const btn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+
+        if(form) {
+            form.addEventListener('submit', function(e) {
+                if (form.checkValidity()) {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btnText.innerHTML = '<div class="loader"></div> Processing Order...';
+                }
+            });
+        }
+    });
+  </script>
+</body>
+</html>

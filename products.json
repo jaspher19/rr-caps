@@ -1,0 +1,29 @@
+[
+    {
+        "id": 1770560793,
+        "name": "CLASSIC NAVY BLUE LA",
+        "price": 599,
+        "category": "classic",
+        "description": null,
+        "badge": "BEST SELLER",
+        "image": "images/products/1770560793_cap-la-black.png"
+    },
+    {
+        "id": 1770560850,
+        "name": "pink bubble retro",
+        "price": 255,
+        "category": "CUSTOMIZED",
+        "description": null,
+        "badge": "LIMITED",
+        "image": "images/products/1770560850_cap-lablack-black.png"
+    },
+    {
+        "id": 1770560937,
+        "name": "golden boy",
+        "price": 700,
+        "category": "TRUCKER",
+        "description": null,
+        "badge": "BEST SELLER",
+        "image": "images/products/1770560937_cap-lagold-black.png"
+    }
+]

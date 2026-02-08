@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #000; font-family: sans-serif; }
+        .progress-line { height: 2px; background: white; transition: width 1s linear; }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center text-white text-center">
+    <div class="max-w-md w-full p-8">
+        <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Syncing Terminal</h1>
+        <p class="text-[10px] text-gray-500 uppercase tracking-widest mb-8">Deploying {{ product_name }} to Storefront</p>
+        
+        <div class="w-full bg-white/10 rounded-full h-[2px] mb-4">
+            <div id="progress-bar" class="progress-line w-full"></div>
+        </div>
+        
+        <p class="text-[40px] font-black" id="countdown">10</p>
+        <p class="text-[8px] uppercase tracking-[0.5em] mt-4 opacity-40">Do not close this window</p>
+    </div>
+
+    <script>
+        let timeLeft = 10;
+        const display = document.getElementById('countdown');
+        const progressBar = document.getElementById('progress-bar');
+        
+        const timer = setInterval(() => {
+            timeLeft--;
+            display.innerText = timeLeft;
+            progressBar.style.width = (timeLeft * 10) + "%";
+            
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                window.location.href = "/admin"; // Redirects back to Admin
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

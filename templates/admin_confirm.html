@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syncing Release | RCAPS4STREET</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0A0A0A; }
+        
+        /* Refined Spinner */
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-bottom-color: #FFF;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-glow {
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen flex items-center justify-center p-6 text-center">
+
+    <div class="max-w-md w-full">
+        <div class="mb-12">
+            <span class="loader"></span>
+        </div>
+        
+        <h1 class="text-4xl font-black uppercase tracking-tighter mb-2">Syncing to Store</h1>
+        <p class="text-gray-500 text-[10px] uppercase tracking-[0.3em] mb-10">
+            Deploying <span class="text-white font-bold">"{{ product_name }}"</span> to Live Inventory
+        </p>
+
+        <div class="bg-[#0F0F0F] border border-white/5 rounded-3xl p-8 mb-8 relative overflow-hidden">
+            <p class="text-[9px] uppercase tracking-[0.4em] text-gray-500 mb-4">Reflection Protocol</p>
+            
+            <div class="text-5xl font-black tracking-tighter mb-6" id="countdown">10</div>
+            
+            <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                <div id="progress-bar" class="bg-white h-full w-full transition-all duration-1000 linear progress-glow"></div>
+            </div>
+            
+            <p class="text-[9px] uppercase tracking-widest text-gray-700 mt-6">Seconds until deployment complete</p>
+        </div>
+
+        <div class="space-y-2">
+            <p class="text-[10px] text-gray-500 uppercase tracking-widest flex items-center justify-center gap-2">
+                <span class="w-1 h-1 bg-red-500 rounded-full animate-pulse"></span>
+                Background Thread Active
+            </p>
+            <p class="text-[11px] text-gray-600 italic">
+                Do not refresh or close this terminal.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let timeLeft = 10;
+        const totalTime = 10;
+        const display = document.getElementById('countdown');
+        const progressBar = document.getElementById('progress-bar');
+        
+        const timer = setInterval(() => {
+            timeLeft--;
+            display.innerText = timeLeft;
+            
+            // Update Progress Bar width
+            const percentage = (timeLeft / totalTime) * 100;
+            progressBar.style.width = percentage + "%";
+            
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                // Smooth transition before redirect
+                display.innerText = "DONE";
+                display.classList.add("text-green-500");
+                
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 500);
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

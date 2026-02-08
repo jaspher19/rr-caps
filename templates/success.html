@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed | RCAPS4STREET</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0A0A0A] text-white flex items-center justify-center min-h-screen py-20">
+
+  <div class="text-center px-6 max-w-md w-full">
+    <div class="mb-8 flex justify-center">
+        <div class="w-20 h-20 rounded-xl border border-white/10 p-1 shadow-2xl bg-black">
+            <img src="{{ url_for('static', filename='images/LOGOS/LOGO.jfif') }}" alt="Logo" class="w-full h-full object-cover rounded-lg">
+        </div>
+    </div>
+
+    <p class="text-[10px] tracking-[0.5em] uppercase text-green-500 font-bold mb-4 italic">Verification Complete</p>
+    <h1 class="text-4xl font-extrabold tracking-tighter uppercase mb-6">Order Confirmed</h1>
+    
+    <p class="text-gray-400 text-sm leading-relaxed mb-8">
+      Thank you for your purchase. A confirmation receipt and tracking link have been sent to <span class="text-white font-bold">{{ email }}</span>.
+    </p>
+
+    <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-6 text-left">
+        <h3 class="text-[9px] tracking-[0.3em] uppercase mb-5 text-gray-500 font-bold">Items Purchased</h3>
+        <div class="space-y-4">
+            {% for item in items %}
+            <div class="flex items-center justify-between group">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-14 bg-[#111] rounded flex items-center justify-center overflow-hidden border border-white/10">
+                        <img src="{{ url_for('static', filename=item.image) }}" class="w-4/5 object-contain">
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-gray-200">{{ item.name }}</p>
+                        <p class="text-[9px] text-gray-500">₱{{ item.price }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="flex justify-between border-t border-white/5 mt-5 pt-4">
+            <span class="text-[9px] uppercase tracking-widest text-gray-500">Total Paid</span>
+            <span class="text-sm font-bold text-white">₱{{ total }}</span>
+        </div>
+    </div>
+
+    <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-10 text-left">
+        <p class="text-[9px] tracking-widest text-gray-500 uppercase mb-3">Shipping To:</p>
+        <p class="text-xs text-gray-200 leading-relaxed font-medium italic">
+            {{ address }}<br>
+            {{ city }}
+        </p>
+    </div>
+
+    <div class="space-y-4">
+        <a href="/shop" class="block w-full bg-white text-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition active:scale-[0.98]">
+            Continue Shopping
+        </a>
+        
+        <p class="text-[9px] text-gray-600 uppercase tracking-widest pt-4 font-mono">
+            Order Reference: #{{ order_id }}
+        </p>
+    </div>
+  </div>
+
+</body>
+</html>

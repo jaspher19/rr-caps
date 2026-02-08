@@ -1,0 +1,376 @@
+[
+    {
+        "order_id": "RR-6811",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png"
+            },
+            {
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png"
+            },
+            {
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png"
+            },
+            {
+                "name": "golden boy",
+                "price": 600,
+                "image": "images/products/cap-lagold-black.png"
+            }
+        ],
+        "total": 2997,
+        "email": "Jasphertampos5@gmail.com"
+    },
+    {
+        "order_id": "RR-2460",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap."
+            },
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition."
+            },
+            {
+                "id": 1770554229,
+                "name": "NEW YORK BRON",
+                "price": 500,
+                "description": "",
+                "image": "images/products/cap-brown-ny.png",
+                "badge": "NEW",
+                "category": "TRUCKER"
+            }
+        ],
+        "total": 2098,
+        "email": "danitajeanpelayo26@gmail.com"
+    },
+    {
+        "order_id": "RR-8513",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap."
+            },
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition."
+            },
+            {
+                "id": 1770554229,
+                "name": "NEW YORK BRON",
+                "price": 500,
+                "description": "",
+                "image": "images/products/cap-brown-ny.png",
+                "badge": "NEW",
+                "category": "TRUCKER"
+            }
+        ],
+        "total": 2098,
+        "email": "Jasphertampos5@gmail.com"
+    },
+    {
+        "order_id": "RR-8620",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap."
+            },
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition."
+            }
+        ],
+        "total": 1598,
+        "email": "danitajeanpelayo26@gmail.com"
+    },
+    {
+        "order_id": "RR-7560",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap.",
+                "quantity": 1
+            },
+            {
+                "id": 1770554229,
+                "name": "NEW YORK BRON",
+                "price": 500,
+                "description": "",
+                "image": "images/products/cap-brown-ny.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            },
+            {
+                "id": 1770554535,
+                "name": "LA PINK",
+                "price": 600,
+                "description": "",
+                "image": "images/products/cap-lablack-black.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            }
+        ],
+        "total": 1899,
+        "email": "danitajeanpelayo26@gmail.com"
+    },
+    {
+        "order_id": "RR-4326",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition.",
+                "quantity": 1
+            },
+            {
+                "id": 1770558528,
+                "name": "Golden Ego",
+                "price": 260,
+                "category": "classic",
+                "description": null,
+                "badge": "NEW",
+                "image": "images/products/1770558528_cap-brown-ny.png",
+                "quantity": 1
+            },
+            {
+                "id": 1770554229,
+                "name": "NEW YORK BRON",
+                "price": 500,
+                "description": "",
+                "image": "images/products/cap-brown-ny.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            },
+            {
+                "id": 1770554535,
+                "name": "LA PINK",
+                "price": 600,
+                "description": "",
+                "image": "images/products/cap-lablack-black.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            }
+        ],
+        "total": 2159,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    },
+    {
+        "order_id": "RR-1445",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap.",
+                "quantity": 1
+            },
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition.",
+                "quantity": 1
+            }
+        ],
+        "total": 1598,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    },
+    {
+        "order_id": "RR-3136",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1770554535,
+                "name": "LA PINK",
+                "price": 600,
+                "description": "",
+                "image": "images/products/cap-lablack-black.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            },
+            {
+                "id": 1770554985,
+                "name": "golden boy",
+                "price": 600,
+                "description": "",
+                "image": "images/products/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "classic",
+                "quantity": 1
+            }
+        ],
+        "total": 1200,
+        "email": "danitajeanpelayo26@gmail.com",
+        "shipping": "CAPILIJAN, IBAJAY, AKLAN, IBAJAY"
+    },
+    {
+        "order_id": "RR-2852",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition.",
+                "quantity": 1
+            },
+            {
+                "id": 1770554229,
+                "name": "NEW YORK BRON",
+                "price": 500,
+                "description": "",
+                "image": "images/products/cap-brown-ny.png",
+                "badge": "NEW",
+                "category": "TRUCKER",
+                "quantity": 1
+            }
+        ],
+        "total": 1299,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon Balabag Malay Aklan Boracay Philippines, MALAY"
+    },
+    {
+        "order_id": "RR-9392",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition.",
+                "quantity": 1
+            }
+        ],
+        "total": 799,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    },
+    {
+        "order_id": "RR-1330",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 3,
+                "name": "LA Gold Edition",
+                "price": 799,
+                "image": "images/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "limited",
+                "description": "Exclusive gold stitched edition.",
+                "quantity": 1
+            }
+        ],
+        "total": 799,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    },
+    {
+        "order_id": "RR-5640",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1,
+                "name": "LA Black Cap",
+                "price": 799,
+                "image": "images/cap-la-black.png",
+                "badge": "BEST SELLER",
+                "category": "classic",
+                "description": "Authentic black streetwear cap.",
+                "quantity": 1
+            }
+        ],
+        "total": 799,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    },
+    {
+        "order_id": "RR-5002",
+        "date": "Feb 08, 2026",
+        "items": [
+            {
+                "id": 1770554985,
+                "name": "golden boy",
+                "price": 600,
+                "description": "",
+                "image": "images/products/cap-lagold-black.png",
+                "badge": "LIMITED",
+                "category": "classic",
+                "quantity": 1
+            }
+        ],
+        "total": 600,
+        "email": "Jasphertampos5@gmail.com",
+        "shipping": "Zone 3 Pinaungon, Balabag"
+    }
+]

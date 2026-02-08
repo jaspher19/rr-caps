@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin | Inventory Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0A0A0A; }
+    .input-field {
+        background: black;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        width: 100%;
+        outline: none;
+        transition: border 0.3s ease;
+    }
+    .input-field:focus { border-color: white; }
+    
+    @keyframes slideDown {
+        from { transform: translateY(-10px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-slide-down { animation: slideDown 0.4s ease-out forwards; }
+
+    .loader-spin {
+      border: 2px solid #000;
+      border-top: 2px solid #fff;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center py-12 px-6">
+
+  <div class="flex gap-8 mb-10">
+    <a href="{{ url_for('home') }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">← Storefront</a>
+    <span class="text-gray-800">|</span>
+    <a href="{{ url_for('view_orders') }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">Order History →</a>
+  </div>
+
+  <div class="w-full max-w-5xl space-y-12">
+    
+    <div class="bg-[#0F0F0F] border border-white/5 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+      <div class="w-full md:w-1/2 bg-black flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-white/5">
+          <div id="preview-container" class="relative w-full aspect-square border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
+              <img id="image-preview" src="#" alt="Preview" class="hidden w-full h-full object-cover">
+              <div id="placeholder-text" class="text-center">
+                  <p class="text-[10px] uppercase tracking-widest text-gray-500">Awaiting Product Asset</p>
+              </div>
+          </div>
+      </div>
+
+      <div class="w-full md:w-1/2 p-8 lg:p-12">
+          <div class="mb-8">
+              <h1 class="text-3xl font-black uppercase tracking-tighter">Release</h1>
+              <p class="text-[10px] text-gray-500 uppercase tracking-widest">Inventory Expansion Control</p>
+          </div>
+
+          {% if request.args.get('success') %}
+          <div id="success-alert" class="animate-slide-down bg-white text-black p-4 rounded-xl mb-6 flex justify-between items-center shadow-xl shadow-white/10">
+              <span class="text-[9px] font-black uppercase tracking-widest">✓ Product Deployed Successfully</span>
+          </div>
+          {% endif %}
+
+          <form id="release-form" action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+              <div>
+                  <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Product Name</label>
+                  <input type="text" name="name" placeholder="e.g. RCAPS GHOST TRUCKER" required class="input-field mt-1">
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                  <div>
+                      <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Price (PHP)</label>
+                      <input type="number" name="price" placeholder="850" required class="input-field mt-1">
+                  </div>
+                  <div>
+                      <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Drop Tag</label>
+                      <select name="badge" class="input-field mt-1 cursor-pointer">
+                          <option value="">None</option>
+                          <option value="NEW">New Release</option>
+                          <option value="LIMITED">Limited Edition</option>
+                          <option value="BEST SELLER">Best Seller</option>
+                      </select>
+                  </div>
+              </div>
+              <div>
+                  <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Category</label>
+                  <input type="text" name="category" placeholder="Classic, Mesh, or Vintage" required class="input-field mt-1">
+              </div>
+              <div>
+                  <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Upload Visual</label>
+                  <input type="file" name="photo" id="photo-input" accept="image/*" required 
+                      class="mt-2 block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-white file:text-black hover:file:bg-gray-200">
+              </div>
+              <button type="submit" id="release-btn" class="w-full bg-white text-black py-5 rounded-xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-gray-200 transition-all active:scale-[0.98]">
+                  <span id="btn-content">Confirm Product Release</span>
+              </button>
+          </form>
+      </div>
+    </div>
+
+    <div class="bg-[#0F0F0F] border border-white/5 rounded-3xl p-8 lg:p-12">
+        <h2 class="text-xl font-black uppercase tracking-tighter mb-8">Active Inventory</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for product in products %}
+            <div class="bg-black border border-white/10 p-4 rounded-2xl flex items-center justify-between group">
+                <div class="flex items-center gap-4">
+                    <img src="{{ url_for('static', filename=product.image) }}" class="w-12 h-12 object-contain bg-[#111] rounded-lg">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wide">{{ product.name }}</p>
+                        <p class="text-[9px] text-gray-500 uppercase">₱{{ product.price }}</p>
+                    </div>
+                </div>
+                <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Delete this product?');">
+                    <button type="submit" class="text-red-900 group-hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-gray-600 text-[10px] uppercase tracking-widest py-4">No products currently live.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-red-950/10 border border-red-500/20 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+            <h2 class="text-red-500 text-lg font-black uppercase tracking-tighter">Wipe Storefront</h2>
+            <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Permanently remove all products from the catalog.</p>
+        </div>
+        <form action="{{ url_for('clear_store') }}" method="POST" onsubmit="return confirm('CRITICAL WARNING: This will delete ALL products. Proceed?');">
+            <button type="submit" class="bg-red-600 hover:bg-red-500 text-white py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all">
+                Execute Store Wipe
+            </button>
+        </form>
+    </div>
+
+  </div>
+
+  <script>
+    const photoInput = document.getElementById('photo-input');
+    const imagePreview = document.getElementById('image-preview');
+    const placeholderText = document.getElementById('placeholder-text');
+
+    photoInput.onchange = evt => {
+        const [file] = photoInput.files;
+        if (file) {
+            imagePreview.src = URL.createObjectURL(file);
+            imagePreview.classList.remove('hidden');
+            placeholderText.classList.add('hidden');
+        }
+    }
+
+    document.getElementById('release-form').onsubmit = function() {
+        const btn = document.getElementById('release-btn');
+        const content = document.getElementById('btn-content');
+        btn.classList.add('opacity-50', 'pointer-events-none');
+        content.innerHTML = '<span class="loader-spin"></span> Syncing Terminal...';
+    };
+
+    const alertBox = document.getElementById('success-alert');
+    if (alertBox) {
+        setTimeout(() => {
+            alertBox.style.opacity = '0';
+            alertBox.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => alertBox.remove(), 500);
+        }, 3000);
+    }
+  </script>
+</body>
+</html>

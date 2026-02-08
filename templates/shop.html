@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop All | RCAPS4STREETS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .product-fade { animation: fadeInUp 0.6s ease forwards; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .text-outline { -webkit-text-stroke: 1px rgba(255,255,255,0.4); }
+    
+    .hero-bg {
+      background: linear-gradient(to bottom, rgba(10,10,10,0.7), rgba(10,10,10,1)), 
+                  url('https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&q=80&w=2000');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
+    /* Simple toast notification style */
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #fff;
+      color: #000;
+      text-align: center;
+      padding: 16px;
+      position: fixed;
+      z-index: 100;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-weight: bold;
+    }
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+    @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+    @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+  </style>
+</head>
+
+<body class="bg-[#0A0A0A] text-white">
+
+  <div id="toast">Added to bag</div>
+
+  <nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-4 bg-black/60 backdrop-blur-xl border-b border-white/5">
+    <a href="/" class="flex items-center gap-4 group">
+      <div class="relative w-10 h-10 overflow-hidden rounded-lg border border-white/10 group-hover:border-white/40 transition-all">
+        <img src="{{ url_for('static', filename='images/LOGOS/LOGO.jfif') }}" alt="Logo" class="w-full h-full object-cover">
+      </div>
+      <div class="flex flex-col">
+        <span class="text-lg font-extrabold tracking-tighter leading-none uppercase">RCAPS4STREET</span>
+        <span class="text-[8px] tracking-[0.3em] text-gray-400 uppercase font-bold">Original Series</span>
+      </div>
+    </a>
+
+    <div class="flex items-center gap-8 text-[11px] uppercase tracking-[0.2em] font-medium">
+      <a href="/" class="border-b border-white pb-1">Shop All</a>
+      <a href="/orders" class="text-gray-400 hover:text-white transition">My Orders</a>
+      <a href="/cart" class="text-gray-400 hover:text-white transition flex items-center gap-2">
+        Cart <span id="cart-count" class="bg-white/10 px-2 py-0.5 rounded text-[9px] text-white font-bold">
+          {{ session.get('cart', [])|length }}
+        </span>
+      </a>
+    </div>
+  </nav>
+
+  <header class="hero-bg pt-48 pb-24 px-6 text-center">
+    <div class="max-w-4xl mx-auto">
+        <p class="text-[10px] tracking-[0.6em] uppercase text-gray-400 font-bold mb-6">Premium Collection 2026</p>
+        <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter uppercase leading-none">
+          Shop All <span class="text-outline text-transparent">Caps</span>
+        </h1>
+        <p class="mt-8 text-sm md:text-base text-gray-300 max-w-xl mx-auto font-light leading-relaxed">
+          The definitive headwear collection. Engineered for durability, 
+          designed for the street. Limited quantities available.
+        </p>
+    </div>
+  </header>
+
+  <section class="py-20 px-6 md:px-12 max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-12 text-[10px] tracking-widest uppercase text-gray-500">
+      <span>Styles Available: {{ products|length if products else 0 }}</span>
+      <div class="flex gap-6">
+        <span class="cursor-pointer hover:text-white transition">Sort: Newest</span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+      {% if products %}
+        {% for product in products %}
+        <div class="group product-fade">
+          <div class="relative aspect-[4/5] bg-[#0F0F0F] border border-white/5 overflow-hidden flex items-center justify-center">
+            <img
+              src="{{ url_for('static', filename=product.image) }}"
+              alt="{{ product.name }}"
+              class="w-4/5 object-contain group-hover:scale-110 transition duration-700 ease-in-out"
+            >
+            
+            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+              <button onclick="addToCart('{{ product.id }}')" class="w-full bg-white text-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition active:scale-95">
+                Add To Bag +
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-between items-start px-1">
+            <div>
+              <h3 class="text-[13px] font-bold tracking-wide uppercase">{{ product.name }}</h3>
+              <p class="text-[9px] text-gray-500 uppercase tracking-widest mt-1">
+                  {{ product.badge if product.badge else 'Original Series' }}
+              </p>
+            </div>
+            <span class="text-[13px] font-medium">₱{{ product.price }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="col-span-full text-center text-gray-600 uppercase tracking-widest py-20">No products found in the archive.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <footer class="bg-black text-gray-500 px-6 md:px-12 py-20 border-t border-white/5">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 max-w-7xl mx-auto uppercase text-[10px] tracking-[0.2em]">
+      <div>
+        <p class="text-white mb-6 font-extrabold text-lg tracking-tighter normal-case">RCAPS4STREET</p>
+        <p class="leading-loose normal-case tracking-normal text-gray-600">Premium streetwear headwear designed for the modern landscape.</p>
+      </div>
+      <div>
+        <p class="text-white mb-6 font-bold">Navigation</p>
+        <ul class="space-y-3">
+          <li><a href="/" class="hover:text-white transition">Home</a></li>
+          <li><a href="/orders" class="hover:text-white transition">My Orders</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-white mb-6 font-bold">Support</p>
+        <ul class="space-y-3">
+          <li><a href="#" class="hover:text-white transition">Shipping</a></li>
+          <li><a href="#" class="hover:text-white transition">Returns</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-white mb-6 font-bold">Connect</p>
+        <ul class="space-y-3">
+          <li><a href="#" class="hover:text-white transition">Instagram</a></li>
+          <li><a href="#" class="hover:text-white transition">Facebook</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-20 text-center text-[9px] text-gray-700 uppercase tracking-[0.4em]">
+      &copy; 2026 RCAPS4STREET. ALL RIGHTS RESERVED.
+    </div>
+  </footer>
+
+  <script>
+    function addToCart(productId) {
+      const formData = new FormData();
+      formData.append('id', productId);
+
+      fetch('/add-to-cart', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          // Update cart counter in nav
+          document.getElementById('cart-count').innerText = data.cart_count;
+          
+          // Show toast
+          const toast = document.getElementById("toast");
+          toast.className = "show";
+          setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    }
+  </script>
+</body>
+</html>
