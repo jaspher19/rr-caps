@@ -85,6 +85,7 @@ def admin():
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
+    # FIRST FIX: Check for key to prevent unauthorized deploy
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
@@ -115,6 +116,8 @@ def add_product():
         "image": image_path
     })
     save_products(products)
+    
+    # FIRST FIX: Redirect back with key to maintain session
     return redirect(url_for('admin', key=key, success=1))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
@@ -166,7 +169,6 @@ def remove_from_cart():
         session.modified = True
     return redirect(url_for('cart'))
 
-# FIXED: Added support for both POST and GET to prevent 405/404 errors
 @app.route("/empty-cart", methods=["POST", "GET"])
 def empty_cart():
     session.pop("cart", None)

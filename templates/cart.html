@@ -44,7 +44,7 @@
       </div>
       
       {% if cart %}
-      <form action="/empty-cart" method="POST" onsubmit="return confirm('Are you sure you want to empty your bag?');">
+      <form action="{{ url_for('empty_cart') }}" method="POST" onsubmit="return confirm('Are you sure you want to empty your bag?');">
         <button type="submit" class="text-[10px] text-gray-500 hover:text-white uppercase tracking-[0.2em] transition border border-white/10 px-4 py-2 rounded">
           Empty Bag
         </button>
@@ -73,7 +73,7 @@
               <div class="flex items-center gap-4 mt-2">
                 <span class="text-[10px] text-gray-500 uppercase font-semibold">Qty: {{ item.quantity }}</span>
                 
-                <form action="/remove-from-cart" method="POST">
+                <form action="{{ url_for('remove_from_cart') }}" method="POST">
                   <input type="hidden" name="product_id" value="{{ item.id }}">
                   <button type="submit" class="text-[9px] text-red-500/60 hover:text-red-500 uppercase tracking-widest transition">
                     Remove One
