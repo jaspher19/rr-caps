@@ -71,7 +71,6 @@ def home():
 @app.route("/orders")
 def order_history():
     orders = load_orders()
-    # Check if admin is viewing this to show "System Logs" style
     is_admin = request.args.get('key') == ADMIN_PASSWORD
     return render_template("orders.html", orders=orders, is_admin=is_admin, admin_key=request.args.get('key'))
 
@@ -165,6 +164,13 @@ def remove_from_cart():
         cart.remove(str_id)
         session["cart"] = cart
         session.modified = True
+    return redirect(url_for('cart'))
+
+# FIXED: Added support for both POST and GET to prevent 405/404 errors
+@app.route("/empty-cart", methods=["POST", "GET"])
+def empty_cart():
+    session.pop("cart", None)
+    session.modified = True
     return redirect(url_for('cart'))
 
 @app.route("/cart")
