@@ -163,7 +163,30 @@ def empty_cart():
     return redirect(url_for('view_cart'))
 
 # --- CHECKOUT ---
+# --- ADD THIS SECTION ---
 
+@app.route("/cart")
+def view_cart():
+    products = load_products()
+    cart_ids = session.get("cart", [])
+    
+    # Process the cart to group duplicates and calculate price
+    cart_items = []
+    total_price = 0
+    # Convert IDs to strings to ensure matching works
+    counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    
+    for pid, qty in counts.items():
+        for p in products:
+            if str(p["id"]) == pid:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+                
+    return render_template("cart.html", cart=cart_items, total_price=total_price)
+
+# -----------------------
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
