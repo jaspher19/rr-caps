@@ -29,7 +29,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# --- UPDATED EMAIL CONFIG ---
+# --- EMAIL CONFIG ---
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_TLS'] = False
@@ -40,14 +40,13 @@ app.config['MAIL_DEFAULT_SENDER'] = SHOP_EMAIL
 
 mail = Mail(app)
 
-# --- INVINCIBLE UTILITY FUNCTIONS ---
+# --- UTILITY FUNCTIONS ---
 def load_products():
     if not os.path.exists(PRODUCT_FILE): return []
     try:
         with open(PRODUCT_FILE, 'r') as f: 
             return json.load(f)
-    except:
-        return []
+    except: return []
 
 def save_products(products):
     try:
@@ -61,8 +60,7 @@ def load_orders():
     try:
         with open(ORDER_FILE, 'r') as f:
             return json.load(f)
-    except:
-        return []
+    except: return []
 
 def save_order_to_history(order_data):
     try:
@@ -118,6 +116,7 @@ def add_to_cart():
     session["cart"].append(str(product_id))
     session.modified = True 
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
+
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
     product_id = request.form.get("product_id")
@@ -134,6 +133,7 @@ def empty_cart():
     session.pop("cart", None)
     session.modified = True
     return redirect(url_for('cart'))
+
 @app.route("/cart")
 def cart():
     products = load_products()
@@ -150,7 +150,6 @@ def cart():
                 total_price += p["price"] * qty
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
-# THE FIXED CHECKOUT
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
@@ -176,7 +175,6 @@ def checkout():
                     purchased_items.append({"name": p['name'], "quantity": qty, "price": p['price']})
                     items_html_rows += f"<tr><td>{p['name']} (x{qty})</td><td>₱{line_total}</td></tr>"
 
-        # 1. SAVE & CLEAR FIRST (Safety)
         save_order_to_history({
             "order_id": order_id, 
             "date": datetime.now().strftime("%b %d, %Y"),
@@ -188,7 +186,6 @@ def checkout():
         session.pop("cart", None)
         session.modified = True
 
-        # 2. EMAIL (With internal timeout safety)
         try:
             msg = Message(f"Order #{order_id} Confirmed", recipients=[customer_email, SHOP_EMAIL])
             msg.html = f"<h2>Order {order_id}</h2><table>{items_html_rows}</table><h3>Total: ₱{grand_total}</h3>"
