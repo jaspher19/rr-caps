@@ -17,14 +17,23 @@
       </div>
       <span class="text-xl font-extrabold tracking-tighter uppercase">RCAPS4 <span class="text-gray-500">STREET</span></span>
     </a>
-    <a href="/" class="text-[10px] uppercase tracking-[0.2em] hover:text-gray-400 transition">Back to Store</a>
+    
+    {% if is_admin %}
+    <a href="{{ url_for('admin', key=admin_key) }}" class="text-[10px] uppercase tracking-[0.2em] hover:text-white text-gray-400 transition">← Back to Terminal</a>
+    {% else %}
+    <a href="/" class="text-[10px] uppercase tracking-[0.2em] hover:text-white text-gray-400 transition">Back to Store</a>
+    {% endif %}
   </nav>
 
   <main class="flex-grow max-w-4xl mx-auto py-20 px-6 w-full">
     <div class="mb-12 border-b border-white/10 pb-6 flex justify-between items-end">
         <div>
-            <h1 class="text-4xl font-extrabold uppercase tracking-tighter">Purchase History</h1>
-            <p class="text-gray-500 text-[10px] mt-2 uppercase tracking-[0.3em]">Your lifetime archive with us</p>
+            <h1 class="text-4xl font-extrabold uppercase tracking-tighter">
+                {% if is_admin %}System Logs{% else %}Purchase History{% endif %}
+            </h1>
+            <p class="text-gray-500 text-[10px] mt-2 uppercase tracking-[0.3em]">
+                {% if is_admin %}Full sequence of customer transactions{% else %}Your lifetime archive with us{% endif %}
+            </p>
         </div>
         {% if orders %}
         <span class="text-[10px] text-gray-500 uppercase tracking-widest border border-white/10 px-3 py-1 rounded">
@@ -70,8 +79,9 @@
 
           <div class="bg-black p-6 border-t border-white/5 flex justify-between items-center">
              <div>
-                <p class="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Shipping To</p>
-                <p class="text-[10px] text-gray-300 uppercase">{{ order.get('shipping', 'No Address Provided') }}</p>
+                <p class="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Customer Details</p>
+                <p class="text-[10px] text-gray-300 uppercase">{{ order.get('email', 'N/A') }}</p>
+                <p class="text-[10px] text-gray-500 uppercase">{{ order.get('shipping', 'No Address') }}</p>
              </div>
              <div class="text-right">
                 <p class="text-[9px] uppercase tracking-widest text-gray-500 mb-1">Grand Total</p>
