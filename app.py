@@ -16,13 +16,13 @@ SHOP_EMAIL = 'jasphertampos5@gmail.com'
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Email Config
+# --- UPDATED EMAIL CONFIG (Port 587 Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=465,
-    MAIL_USE_SSL=True,
+    MAIL_PORT=587,             # Switched from 465
+    MAIL_USE_TLS=True,         # Enabled TLS
+    MAIL_USE_SSL=False,        # Disabled SSL (required for 587)
     MAIL_USERNAME=SHOP_EMAIL,
-    # Ensure this is a 16-character App Password from Google
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL
 )
