@@ -61,7 +61,6 @@ def save_order_to_history(order_data):
         json.dump(orders, f, indent=4)
 
 # --- PUBLIC ROUTES ---
-
 @app.route("/")
 @app.route("/shop")
 def home():
@@ -75,7 +74,6 @@ def order_history():
     return render_template("orders.html", orders=orders)
 
 # --- SECURE ADMIN ROUTES ---
-
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
@@ -119,20 +117,20 @@ def add_product():
             "image": image_path
         })
         save_products(products)
-        # Redirect back to admin dashboard with the key
         return redirect(url_for('admin', key=key, success=1))
     
-    # If GET request, show the add product page
     return render_template("admin_add.html", admin_key=key)
 
-@app.route("/admin/delete/<int:product_id>", methods=["POST"])
+@app.route("/admin/delete/<int:product_id>", methods=["POST", "GET"])
 def delete_product(product_id):
+    # Fix: Explicitly check for key in URL
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
     products = load_products()
     products = [p for p in products if p['id'] != product_id]
     save_products(products)
+    # Fix: Redirect back with the key
     return redirect(url_for('admin', key=key, deleted=1))
 
 @app.route("/admin/clear-store", methods=["POST"])
@@ -152,7 +150,6 @@ def view_orders():
     return render_template("orders.html", orders=orders, is_admin=True, admin_key=key)
 
 # --- CART & CHECKOUT ROUTES ---
-
 @app.route("/add-to-cart", methods=["POST"])
 def add_to_cart():
     product_id = request.form.get("id")
