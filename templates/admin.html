@@ -43,7 +43,7 @@
   <div class="flex gap-8 mb-10">
     <a href="{{ url_for('home') }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">← Storefront</a>
     <span class="text-gray-800">|</span>
-    <a href="{{ url_for('view_orders') }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">Order History →</a>
+    <a href="{{ url_for('view_orders', key=admin_key) }}" class="text-[10px] uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all">Order History →</a>
   </div>
 
   <div class="w-full max-w-5xl space-y-12">
@@ -70,19 +70,19 @@
           </div>
           {% endif %}
 
-          <form id="release-form" action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+          <form id="release-form" action="{{ url_for('add_product', key=admin_key) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
               <div>
                   <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Product Name</label>
-                  <input type="text" name="name" placeholder="e.g. RCAPS GHOST TRUCKER" required class="input-field mt-1">
+                  <input type="text" name="name" placeholder="e.g. RCAPS GHOST TRUCKER" required class="input-field mt-1 text-white">
               </div>
               <div class="grid grid-cols-2 gap-4">
                   <div>
                       <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Price (PHP)</label>
-                      <input type="number" name="price" placeholder="850" required class="input-field mt-1">
+                      <input type="number" name="price" placeholder="850" required class="input-field mt-1 text-white">
                   </div>
                   <div>
                       <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Drop Tag</label>
-                      <select name="badge" class="input-field mt-1 cursor-pointer">
+                      <select name="badge" class="input-field mt-1 cursor-pointer text-white">
                           <option value="">None</option>
                           <option value="NEW">New Release</option>
                           <option value="LIMITED">Limited Edition</option>
@@ -92,7 +92,7 @@
               </div>
               <div>
                   <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Category</label>
-                  <input type="text" name="category" placeholder="Classic, Mesh, or Vintage" required class="input-field mt-1">
+                  <input type="text" name="category" placeholder="Classic, Mesh, or Vintage" required class="input-field mt-1 text-white">
               </div>
               <div>
                   <label class="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">Upload Visual</label>
@@ -118,7 +118,7 @@
                         <p class="text-[9px] text-gray-500 uppercase">₱{{ product.price }}</p>
                     </div>
                 </div>
-                <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Delete this product?');">
+                <form action="{{ url_for('delete_product', product_id=product.id, key=admin_key) }}" method="POST" onsubmit="return confirm('Delete this product?');">
                     <button type="submit" class="text-red-900 group-hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
                 </form>
             </div>
@@ -133,7 +133,7 @@
             <h2 class="text-red-500 text-lg font-black uppercase tracking-tighter">Wipe Storefront</h2>
             <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Permanently remove all products from the catalog.</p>
         </div>
-        <form action="{{ url_for('clear_store') }}" method="POST" onsubmit="return confirm('CRITICAL WARNING: This will delete ALL products. Proceed?');">
+        <form action="{{ url_for('clear_store', key=admin_key) }}" method="POST" onsubmit="return confirm('CRITICAL WARNING: This will delete ALL products. Proceed?');">
             <button type="submit" class="bg-red-600 hover:bg-red-500 text-white py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all">
                 Execute Store Wipe
             </button>
