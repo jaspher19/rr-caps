@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Product | Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background-color: #000; color: #fff; font-family: 'Arial', sans-serif; padding: 40px; }
+        .form-container { max-width: 500px; margin: auto; background: #111; padding: 30px; border: 1px solid #333; border-radius: 8px; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; }
+        button { width: 100%; padding: 15px; background: #fff; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; }
+        button:hover { background: #ccc; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<div class="form-container">
+    <h2>Add New Cap</h2>
+    <p style="color: #888; font-size: 0.9em;">Fill in the details below to add a product to the shop.</p>
+    <hr style="border: 0.5px solid #333;">
+
+    <form action="/admin/add?key={{ admin_key }}" method="POST" enctype="multipart/form-data">
+        
+        <label>Product Name</label>
+        <input type="text" name="name" placeholder="e.g., Black Street Boss Cap" required>
+
+        <label>Price (₱)</label>
+        <input type="number" name="price" placeholder="e.g., 550" required>
+
+        <label>Category</label>
+        <select name="category">
+            <option value="Snapback">Snapback</option>
+            <option value="Trucker">Trucker</option>
+            <option value="Beanie">Beanie</option>
+            <option value="Limited">Limited Edition</option>
+        </select>
+
+        <label>Description</label>
+        <textarea name="description" rows="3" placeholder="Describe the material or fit..."></textarea>
+
+        <label>Badge (Optional)</label>
+        <input type="text" name="badge" placeholder="e.g., New Arrival or 20% OFF">
+
+        <label>Product Image</label>
+        <input type="file" name="photo" accept="image/*" required>
+
+        <button type="submit">UPLOAD PRODUCT</button>
+    </form>
+
+    <a href="/admin?key={{ admin_key }}" class="back-link">← Cancel and Back</a>
+</div>
+
+</body>
+</html>
