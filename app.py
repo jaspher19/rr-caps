@@ -85,7 +85,6 @@ def admin():
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
-    # FIRST FIX: Check for key to prevent unauthorized deploy
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
@@ -116,8 +115,6 @@ def add_product():
         "image": image_path
     })
     save_products(products)
-    
-    # FIRST FIX: Redirect back with key to maintain session
     return redirect(url_for('admin', key=key, success=1))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
@@ -128,7 +125,6 @@ def delete_product(product_id):
     products = load_products()
     products = [p for p in products if p['id'] != product_id]
     save_products(products)
-    
     return redirect(url_for('admin', key=key, deleted=1))
 
 @app.route("/admin/clear-store", methods=["POST"])
@@ -193,6 +189,7 @@ def cart():
                 
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
+# 2ND FIX: ROBUST CHECKOUT
 @app.route("/checkout", methods=["POST"])
 def checkout():
     products = load_products()
@@ -203,6 +200,8 @@ def checkout():
     customer_email = request.form.get("email")
     customer_address = request.form.get("address")
     customer_city = request.form.get("city")
+    customer_zip = request.form.get("zip", "N/A") # Added Zip Support
+    
     order_id = f"RR-{random.randint(1000, 9999)}"
     
     purchased_items = []
@@ -224,31 +223,35 @@ def checkout():
                     <td style="padding: 10px; color: #fff; text-align: right;">₱{line_total}</td>
                 </tr>"""
 
+    # Always save history first
     save_order_to_history({
         "order_id": order_id, 
         "date": datetime.now().strftime("%b %d, %Y"),
         "items": purchased_items, 
         "total": grand_total, 
         "email": customer_email,
-        "shipping": f"{customer_address}, {customer_city}"
+        "shipping": f"{customer_address}, {customer_city}, {customer_zip}"
     })
 
+    # Wrap email in try/except so SMTP errors don't trigger 500 Internal Server Error
     try:
         msg = Message(f"Order #{order_id} Confirmed - RCAPS4STREET", recipients=[customer_email, SHOP_EMAIL])
         msg.html = f"""
         <div style="background-color: #000; color: #fff; padding: 30px; font-family: sans-serif;">
             <h1 style="border-bottom: 1px solid #fff; padding-bottom: 10px;">RECEIPT</h1>
             <p>Order ID: {order_id}</p>
-            <p>Shipping to: {customer_address}, {customer_city}</p>
+            <p>Shipping to: {customer_address}, {customer_city}, {customer_zip}</p>
             <table style="width: 100%; border-collapse: collapse;">{items_html_rows}</table>
             <h2 style="text-align: right; border-top: 1px solid #fff; padding-top: 10px;">TOTAL: ₱{grand_total}</h2>
         </div>
         """
         mail.send(msg)
     except Exception as e:
-        print(f"DEBUG: Email sending failed: {e}")
+        # Log error to console but don't break the user's experience
+        print(f"SMTP Error: {e}")
 
     session.pop("cart", None)
+    session.modified = True
     return render_template("success.html", order_id=order_id, total=grand_total)
 
 if __name__ == "__main__":
