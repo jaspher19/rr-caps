@@ -5,7 +5,7 @@ import random, os, json, time, threading
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_ultra_secret_key")
+app.secret_key = os.environ.get("SECRET_KEY", "bsjbptoaxqzjoern")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 UPLOAD_FOLDER = 'static/images/products'
