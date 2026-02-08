@@ -131,31 +131,61 @@ def add_to_cart():
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
+        # 1. Capture Cart Data before clearing it
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
+        products = load_products()
+        checkout_items = []
+        total_price = 0
+        
+        # Identify which products are in the cart and count them
+        counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
+        for pid, qty in counts.items():
+            for p in products:
+                if str(p["id"]) == pid:
+                    item = p.copy()
+                    item['quantity'] = qty
+                    checkout_items.append(item)
+                    total_price += p["price"] * qty
+        
+        # 2. Capture Form Data
         customer_email = request.form.get("email")
+        customer_address = request.form.get("address", "N/A")
+        customer_city = request.form.get("city", "N/A")
         order_id = f"RR-{random.randint(1000, 9999)}"
         
-        # Save order
+        # 3. Save Order to JSON
         orders = load_orders()
         orders.append({
             "order_id": order_id, 
             "email": customer_email,
+            "address": customer_address,
+            "city": customer_city,
+            "total": total_price,
             "date": datetime.now().strftime("%b %d, %Y")
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        session.pop("cart", None)
-        session.modified = True
-
+        # 4. Email Notification
         msg = Message(subject=f"Order {order_id} Confirmed", 
                       sender=SHOP_EMAIL, 
                       recipients=[customer_email, SHOP_EMAIL])
-        msg.body = f"Thank you for your order! Your Order ID is {order_id}."
+        msg.body = f"Thank you for your order!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {customer_address}, {customer_city}"
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
-        return render_template("success.html", order_id=order_id)
+        # 5. Clear Cart
+        session.pop("cart", None)
+        session.modified = True
+
+        # 6. Pass data to success template
+        return render_template("success.html", 
+                               order_id=order_id, 
+                               items=checkout_items, 
+                               total=total_price, 
+                               email=customer_email, 
+                               address=customer_address, 
+                               city=customer_city)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
