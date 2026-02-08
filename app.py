@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
 from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
-import random, os, json, time
+import random, os, json, time, threading
 from datetime import datetime
 
 app = Flask(__name__)
@@ -26,6 +26,14 @@ app.config.update(
     MAIL_DEFAULT_SENDER=SHOP_EMAIL
 )
 mail = Mail(app)
+
+# --- ASYNC EMAIL HELPER ---
+def send_async_email(app, msg):
+    with app.app_context():
+        try:
+            mail.send(msg)
+        except Exception as e:
+            print(f"Background Mail Error: {e}")
 
 # --- UTILS ---
 def load_products():
@@ -84,7 +92,6 @@ def add_product():
     save_products(products)
     return redirect(url_for('admin', key=key))
 
-# MISSING ADMIN DELETE ROUTE (Fixes the Admin Error)
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
     key = request.args.get('key')
@@ -131,21 +138,31 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
+        customer_email = request.form.get("email")
         order_id = f"RR-{random.randint(1000, 9999)}"
-        # Process order logic here... (omitted for brevity, keep your existing logic)
         
-        save_order_to_history({"order_id": order_id, "email": request.form.get("email")}) # Example
-        session.pop("cart", None); session.modified = True
+        # 1. Save data and clear session immediately (The fast part)
+        save_order_to_history({
+            "order_id": order_id, 
+            "email": customer_email,
+            "date": datetime.now().strftime("%b %d, %Y")
+        })
+        session.pop("cart", None)
+        session.modified = True
 
-        try:
-            msg = Message(f"Order {order_id}", recipients=[request.form.get("email"), SHOP_EMAIL])
-            msg.body = "Order Confirmed"
-            mail.send(msg)
-        except: print("Mail failed but order saved.")
+        # 2. Prepare the Email Message
+        msg = Message(f"Order {order_id} Confirmed", recipients=[customer_email, SHOP_EMAIL])
+        msg.body = f"Thank you for your order! Your Order ID is {order_id}."
 
+        # 3. FIX: Start a background thread for the email so the user doesn't wait
+        threading.Thread(target=send_async_email, args=(app, msg)).start()
+
+        # 4. Instantly return the success page
         return render_template("success.html", order_id=order_id)
+
     except Exception as e:
-        return f"Order Processed! ID: RR-{random.randint(1000,9999)}"
+        print(f"Checkout Error: {e}")
+        return redirect(url_for('home'))
 
 if __name__ == "__main__":
     app.run(debug=True)
