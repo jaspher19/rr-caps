@@ -19,11 +19,12 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # --- UPDATED EMAIL CONFIG (Port 587 Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,             # Switched from 465
-    MAIL_USE_TLS=True,         # Enabled TLS
-    MAIL_USE_SSL=False,        # Disabled SSL (required for 587)
+    MAIL_PORT=587,             # Standard submission port
+    MAIL_USE_TLS=True,         # Use TLS instead of SSL
+    MAIL_USE_SSL=False,
     MAIL_USERNAME=SHOP_EMAIL,
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
+    # Ensure this is your 16-character App Password
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'), 
     MAIL_DEFAULT_SENDER=SHOP_EMAIL
 )
 mail = Mail(app)
@@ -32,13 +33,10 @@ mail = Mail(app)
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            # Adding a tiny sleep ensures the main request completes 
-            # and doesn't interfere with the socket opening
-            time.sleep(1) 
             mail.send(msg)
-            print("Email sent successfully!")
+            print(">>> EMAIL SENT SUCCESSFULLY")
         except Exception as e:
-            print(f"Background Mail Error: {e}")
+            print(f">>> Background Mail Error: {e}")
 
 # --- UTILS ---
 def load_products():
@@ -146,7 +144,7 @@ def checkout():
         customer_email = request.form.get("email")
         order_id = f"RR-{random.randint(1000, 9999)}"
         
-        # 1. Save data and clear session immediately
+        # Save order
         save_order_to_history({
             "order_id": order_id, 
             "email": customer_email,
@@ -155,8 +153,7 @@ def checkout():
         session.pop("cart", None)
         session.modified = True
 
-        # 2. Prepare the Email Message
-        # Using sender=SHOP_EMAIL explicitly helps bypass spam filters
+        # Prepare Message
         msg = Message(
             subject=f"Order {order_id} Confirmed",
             sender=SHOP_EMAIL,
@@ -164,10 +161,9 @@ def checkout():
         )
         msg.body = f"Thank you for your order! Your Order ID is {order_id}."
 
-        # 3. Start a background thread for the email
+        # Start Thread
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
-        # 4. Instantly return the success page
         return render_template("success.html", order_id=order_id)
 
     except Exception as e:
