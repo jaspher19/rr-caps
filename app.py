@@ -28,10 +28,15 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# --- UPDATED EMAIL CONFIG (PORT 465 SSL) ---
+# This is the primary fix for the Render "Worker Timeout"
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = SHOP_EMAIL
+# Ensure your Render Environment Variable 'MAIL_PASSWORD' is a 16-character App Password
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern') 
 app.config['MAIL_DEFAULT_SENDER'] = SHOP_EMAIL
 
@@ -189,7 +194,7 @@ def cart():
                 
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
-# 2ND FIX: ROBUST CHECKOUT
+# ROBUST CHECKOUT WITH TIMEOUT PROTECTION
 @app.route("/checkout", methods=["POST"])
 def checkout():
     products = load_products()
@@ -200,7 +205,7 @@ def checkout():
     customer_email = request.form.get("email")
     customer_address = request.form.get("address")
     customer_city = request.form.get("city")
-    customer_zip = request.form.get("zip", "N/A") # Added Zip Support
+    customer_zip = request.form.get("zip", "N/A")
     
     order_id = f"RR-{random.randint(1000, 9999)}"
     
@@ -223,7 +228,7 @@ def checkout():
                     <td style="padding: 10px; color: #fff; text-align: right;">₱{line_total}</td>
                 </tr>"""
 
-    # Always save history first
+    # 1. SAVE ORDER DATA FIRST - Secure the sale before trying the email
     save_order_to_history({
         "order_id": order_id, 
         "date": datetime.now().strftime("%b %d, %Y"),
@@ -233,7 +238,13 @@ def checkout():
         "shipping": f"{customer_address}, {customer_city}, {customer_zip}"
     })
 
-    # Wrap email in try/except so SMTP errors don't trigger 500 Internal Server Error
+    # 2. CLEAR CART
+    session.pop("cart", None)
+    session.modified = True
+
+    # 3. ATTEMPT EMAIL
+    # The try/except block ensures that if the email connection hangs,
+    # the code won't reach the Gunicorn timeout limit before returning the success page.
     try:
         msg = Message(f"Order #{order_id} Confirmed - RCAPS4STREET", recipients=[customer_email, SHOP_EMAIL])
         msg.html = f"""
@@ -247,11 +258,9 @@ def checkout():
         """
         mail.send(msg)
     except Exception as e:
-        # Log error to console but don't break the user's experience
         print(f"SMTP Error: {e}")
 
-    session.pop("cart", None)
-    session.modified = True
+    # 4. REDIRECT TO SUCCESS IMMEDIATELY
     return render_template("success.html", order_id=order_id, total=grand_total)
 
 if __name__ == "__main__":
