@@ -71,7 +71,9 @@ def home():
 @app.route("/orders")
 def order_history():
     orders = load_orders()
-    return render_template("orders.html", orders=orders)
+    # Check if admin is viewing this to show "System Logs" style
+    is_admin = request.args.get('key') == ADMIN_PASSWORD
+    return render_template("orders.html", orders=orders, is_admin=is_admin, admin_key=request.args.get('key'))
 
 # --- SECURE ADMIN ROUTES ---
 @app.route("/admin")
@@ -82,49 +84,42 @@ def admin():
     products = load_products()
     return render_template("admin.html", products=products, admin_key=key)
 
-@app.route("/admin/add", methods=["GET", "POST"])
+@app.route("/admin/add", methods=["POST"])
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
-    if request.method == "POST":
-        name = request.form.get("name")
-        price = request.form.get("price", 0)
-        category = request.form.get("category")
-        description = request.form.get("description")
-        badge = request.form.get("badge")
-        
-        try: price = int(price)
-        except: price = 0
-        
-        file = request.files.get("photo")
-        image_path = "images/products/default.jpg" 
-        
-        if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            unique_name = f"{int(time.time())}_{filename}"
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
-            image_path = f"images/products/{unique_name}"
-
-        products = load_products()
-        products.append({
-            "id": int(time.time()), 
-            "name": name,
-            "price": price,
-            "category": category,
-            "description": description,
-            "badge": badge,
-            "image": image_path
-        })
-        save_products(products)
-        # We pass the key back during redirect to keep the session alive
-        return redirect(url_for('admin', key=key, success=1))
+    name = request.form.get("name")
+    price = request.form.get("price", 0)
+    category = request.form.get("category")
+    badge = request.form.get("badge")
     
-    return render_template("admin_add.html", admin_key=key)
+    try: price = int(price)
+    except: price = 0
+    
+    file = request.files.get("photo")
+    image_path = "images/products/default.jpg" 
+    
+    if file and file.filename != '':
+        filename = secure_filename(file.filename)
+        unique_name = f"{int(time.time())}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+        image_path = f"images/products/{unique_name}"
 
-@app.route("/admin/delete/<int:product_id>", methods=["POST", "GET"])
+    products = load_products()
+    products.append({
+        "id": int(time.time()), 
+        "name": name,
+        "price": price,
+        "category": category,
+        "badge": badge,
+        "image": image_path
+    })
+    save_products(products)
+    return redirect(url_for('admin', key=key, success=1))
+
+@app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
-    # This checks the ?key= in the URL for the delete action
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
 
@@ -132,7 +127,6 @@ def delete_product(product_id):
     products = [p for p in products if p['id'] != product_id]
     save_products(products)
     
-    # Redirect back to admin with the key so the dashboard remains authorized
     return redirect(url_for('admin', key=key, deleted=1))
 
 @app.route("/admin/clear-store", methods=["POST"])
@@ -173,12 +167,6 @@ def remove_from_cart():
         session.modified = True
     return redirect(url_for('cart'))
 
-@app.route("/empty-cart", methods=["POST"])
-def empty_cart():
-    session.pop("cart", None)
-    session.modified = True
-    return redirect(url_for('cart'))
-
 @app.route("/cart")
 def cart():
     products = load_products()
@@ -201,8 +189,7 @@ def cart():
 def checkout():
     products = load_products()
     cart_ids = session.get("cart", [])
-    if not cart_ids:
-        return redirect(url_for("home"))
+    if not cart_ids: return redirect(url_for("home"))
 
     counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
     customer_email = request.form.get("email")
