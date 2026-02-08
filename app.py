@@ -19,12 +19,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # --- UPDATED EMAIL CONFIG (Port 587 Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,             # Standard submission port
-    MAIL_USE_TLS=True,         # Use TLS instead of SSL
-    MAIL_USE_SSL=False,
+    MAIL_PORT=587,             # Standard for cloud apps
+    MAIL_USE_TLS=True,         # Must be True for 587
+    MAIL_USE_SSL=False,        # Must be False for 587
     MAIL_USERNAME=SHOP_EMAIL,
-    # Ensure this is your 16-character App Password
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'), 
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL
 )
 mail = Mail(app)
