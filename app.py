@@ -22,6 +22,7 @@ app.config.update(
     MAIL_PORT=465,
     MAIL_USE_SSL=True,
     MAIL_USERNAME=SHOP_EMAIL,
+    # Ensure this is a 16-character App Password from Google
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL
 )
@@ -31,7 +32,11 @@ mail = Mail(app)
 def send_async_email(app, msg):
     with app.app_context():
         try:
+            # Adding a tiny sleep ensures the main request completes 
+            # and doesn't interfere with the socket opening
+            time.sleep(1) 
             mail.send(msg)
+            print("Email sent successfully!")
         except Exception as e:
             print(f"Background Mail Error: {e}")
 
@@ -141,7 +146,7 @@ def checkout():
         customer_email = request.form.get("email")
         order_id = f"RR-{random.randint(1000, 9999)}"
         
-        # 1. Save data and clear session immediately (The fast part)
+        # 1. Save data and clear session immediately
         save_order_to_history({
             "order_id": order_id, 
             "email": customer_email,
@@ -151,10 +156,15 @@ def checkout():
         session.modified = True
 
         # 2. Prepare the Email Message
-        msg = Message(f"Order {order_id} Confirmed", recipients=[customer_email, SHOP_EMAIL])
+        # Using sender=SHOP_EMAIL explicitly helps bypass spam filters
+        msg = Message(
+            subject=f"Order {order_id} Confirmed",
+            sender=SHOP_EMAIL,
+            recipients=[customer_email, SHOP_EMAIL]
+        )
         msg.body = f"Thank you for your order! Your Order ID is {order_id}."
 
-        # 3. FIX: Start a background thread for the email so the user doesn't wait
+        # 3. Start a background thread for the email
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         # 4. Instantly return the success page
