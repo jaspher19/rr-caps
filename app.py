@@ -118,7 +118,22 @@ def add_to_cart():
     session["cart"].append(str(product_id))
     session.modified = True 
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    product_id = request.form.get("product_id")
+    cart = session.get("cart", [])
+    str_id = str(product_id)
+    if str_id in cart:
+        cart.remove(str_id)
+        session["cart"] = cart
+        session.modified = True
+    return redirect(url_for('cart'))
 
+@app.route("/empty-cart", methods=["POST", "GET"])
+def empty_cart():
+    session.pop("cart", None)
+    session.modified = True
+    return redirect(url_for('cart'))
 @app.route("/cart")
 def cart():
     products = load_products()
