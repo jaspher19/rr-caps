@@ -8,6 +8,7 @@ import random, os, json, time
 from datetime import datetime
 
 app = Flask(__name__)
+# Pulls from Render Env; uses fallback only for local development
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
@@ -21,6 +22,8 @@ ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # --- EMAIL CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
+
+# SAFE METHOD: Your API Key also acts as your SMTP Password
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -35,42 +38,48 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA BREVO SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo SMTP SSL (Port 465) to prevent Render timeouts."""
+    """Sends email via Brevo SMTP Relay (More reliable for Gmail senders)."""
     if not BREVO_API_KEY:
-        print(">>> SMTP ERROR: BREVO_API_KEY is EMPTY!")
+        print(">>> SMTP ERROR: BREVO_API_KEY is EMPTY in environment variables!")
         return
 
-    # Using Port 465 (SSL) is usually more stable on Render than 587
+    # Brevo SMTP Settings
     smtp_server = "smtp-relay.brevo.com"
-    smtp_port = 465 
+    smtp_port = 587
     
+    # Create the email message
     msg = MIMEMultipart()
     msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
     msg['To'] = customer_email
     msg['Subject'] = f"Order Confirmation: {order_id} - RCAPS4STREETS"
 
-    body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {address}, {city}\n\nThank you for shopping with us!"
+    body = f"""
+Hello,
+
+This is a receipt for your order at RCAPS4STREETS.
+
+Order ID: {order_id}
+Total: ₱{total_price}
+Shipping to: {address}, {city}
+
+Thank you for shopping with us!
+"""
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> SMTP ATTEMPT: Connecting via SSL to {smtp_server}...")
-        # Added timeout=10 to prevent the entire app from hanging if connection is slow
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
-        
-        try:
-            server.login(MAIL_USER, BREVO_API_KEY)
-        except smtplib.SMTPAuthenticationError:
-            print(">>> SMTP AUTH FAILURE: Check if your API Key is correct and SMTP is enabled in Brevo.")
-            return
-
+        print(f">>> SMTP ATTEMPT: Sending via Brevo SMTP for Order {order_id}...")
+        # Connect and Send
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()  # Upgrade the connection to secure
+        server.login(MAIL_USER, BREVO_API_KEY)
         server.send_message(msg)
         
-        # Send a copy to yourself
+        # Also send a copy to yourself
         msg['To'] = MAIL_USER
         server.send_message(msg)
         
         server.quit()
-        print(">>> SUCCESS: Email sent successfully via SMTP SSL!")
+        print(">>> SUCCESS: Email sent successfully via SMTP!")
     except Exception as e:
         print(f">>> SMTP FAILURE: {str(e)}")
 
@@ -95,12 +104,98 @@ def load_orders():
 def home():
     return render_template("index.html", products=load_products(), cart_count=len(session.get("cart", [])))
 
+@app.route("/admin")
+def admin():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    return render_template("admin.html", products=load_products(), admin_key=key)
+
+@app.route("/admin/add", methods=["POST"])
+def add_product():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    file = request.files.get("photo")
+    image_path = "images/products/default.jpg"
+    if file:
+        filename = secure_filename(file.filename)
+        unique_name = f"{int(time.time())}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+        image_path = f"images/products/{unique_name}"
+    
+    products = load_products()
+    products.append({
+        "id": int(time.time()), 
+        "name": request.form.get("name"),
+        "price": int(request.form.get("price", 0)),
+        "image": image_path,
+        "badge": request.form.get("badge"),
+        "category": request.form.get("category")
+    })
+    save_products(products)
+    return redirect(url_for('admin', key=key, success=True))
+
+@app.route("/admin/delete/<int:product_id>", methods=["POST"])
+def delete_product(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    products = [p for p in load_products() if p['id'] != product_id]
+    save_products(products)
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/clear", methods=["POST"])
+def clear_store():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    save_products([])
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/orders")
+def order_history():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    return render_template("orders.html", orders=load_orders(), admin_key=key)
+
+@app.route("/cart")
+def view_cart():
+    products = load_products()
+    cart_ids = session.get("cart", [])
+    cart_items = []
+    total_price = 0
+    counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    for pid, qty in counts.items():
+        for p in products:
+            if str(p["id"]) == pid:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+    return render_template("cart.html", cart=cart_items, total_price=total_price)
+
+@app.route("/add-to-cart", methods=["POST"])
+def add_to_cart():
+    if "cart" not in session: session["cart"] = []
+    session["cart"].append(str(request.form.get("id")))
+    session.modified = True
+    return jsonify({"status": "success", "cart_count": len(session["cart"])})
+
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    product_id = request.form.get("product_id")
+    if "cart" in session and str(product_id) in session["cart"]:
+        session["cart"].remove(str(product_id))
+        session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    return redirect(url_for('view_cart'))
+
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
-        
         products = load_products()
         checkout_items = []
         total_price = 0
@@ -126,16 +221,12 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # This function now uses SSL to avoid timeouts
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
-        
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, items=checkout_items, total=total_price, email=customer_email, address=customer_address, city=customer_city)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
-
-# Include your Admin and Cart routes here...
 
 if __name__ == "__main__":
     app.run(debug=True)
