@@ -14,3 +14,7 @@ packaging==26.0
 requests==2.32.5
 urllib3==2.6.3
 Werkzeug==3.1.5
+Flask
+requests
+gunicorn
+werkzeug

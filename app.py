@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests  # Replaces smtplib for better reliability on Render
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from werkzeug.utils import secure_filename
 import random, os, json, time
 from datetime import datetime
@@ -18,8 +20,12 @@ PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # --- EMAIL CONFIG ---
-MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
+# Your new SMTP Login
+MAIL_USER = os.environ.get('MAIL_USERNAME', 'a1e562001@smtp-brevo.com')
+# Your Brevo API Key (used as the password)
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
+# The original email for display/BCC
+ADMIN_EMAIL = "ultrainstinct1596321@gmail.com"
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -31,45 +37,46 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL VIA BREVO API FUNCTION ---
+# --- EMAIL VIA BREVO SMTP (PORT 587) ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo API. Bypasses SMTP timeout issues on Render."""
+    """Sends email via Brevo SMTP using Port 587 with STARTTLS."""
     if not BREVO_API_KEY:
-        print(">>> API ERROR: BREVO_API_KEY is missing!")
+        print(">>> SMTP ERROR: BREVO_API_KEY is missing!")
         return
 
-    url = "https://api.brevo.com/v3/smtp/email"
+    smtp_server = "smtp-relay.brevo.com"
+    smtp_port = 587 
     
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": BREVO_API_KEY
-    }
+    msg = MIMEMultipart()
+    msg['From'] = f"RCAPS4STREETS <{ADMIN_EMAIL}>"
+    msg['To'] = customer_email
+    msg['Subject'] = f"Order Confirmation: {order_id}"
 
-    payload = {
-        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
-        "to": [{"email": customer_email}],
-        "subject": f"Order Confirmation: {order_id}",
-        "textContent": (
-            f"Order Confirmation\n\n"
-            f"Order ID: {order_id}\n"
-            f"Total: ₱{total_price}\n"
-            f"Address: {address}, {city}\n\n"
-            f"Thank you for shopping with us!"
-        ),
-        "bcc": [{"email": MAIL_USER}]  # Admin receives a copy automatically
-    }
+    body = f"Order Confirmation\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {address}, {city}\n\nThank you for shopping!"
+    msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> API ATTEMPT: Sending request to Brevo for Order {order_id}...")
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        print(f">>> SMTP ATTEMPT: Connecting to {smtp_server}:{smtp_port}...")
+        # Port 587 uses standard SMTP then upgrades via STARTTLS
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=20)
         
-        if response.status_code in [200, 201, 202]:
-            print(">>> SUCCESS: Email sent via API!")
-        else:
-            print(f">>> API FAILURE: Status {response.status_code} - {response.text}")
+        print(">>> SMTP: Securing connection with STARTTLS...")
+        server.starttls() 
+        
+        print(">>> SMTP: Logging in...")
+        server.login(MAIL_USER, BREVO_API_KEY)
+        
+        print(">>> SMTP: Sending message...")
+        server.send_message(msg)
+        
+        # Self copy for admin
+        msg['To'] = ADMIN_EMAIL
+        server.send_message(msg)
+        
+        server.quit()
+        print(">>> SUCCESS: Email sent via Port 587!")
     except Exception as e:
-        print(f">>> API EXCEPTION: {str(e)}")
+        print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -159,7 +166,6 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # Trigger API call
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
