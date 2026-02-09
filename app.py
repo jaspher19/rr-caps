@@ -1,13 +1,12 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests  # Required for Brevo API
 from werkzeug.utils import secure_filename
 import random, os, json, time
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_ultra_secret_key")
+# Pulls from Render Env; uses fallback only for local development
+app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 # --- PERSISTENT STORAGE CONFIG ---
@@ -21,9 +20,12 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# --- GMAIL SMTP CONFIG ---
+# --- EMAIL CONFIG (CLEANED) ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
-GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'jmjfvzcpaxfwxmvp')
+
+# GitHub Push Protection fix: The key is now EXCLUSIVELY pulled from Render Environment Variables
+# Make sure to add 'BREVO_API_KEY' in the Render Dashboard -> Environment tab
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -35,15 +37,23 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL VIA SMTP FUNCTION ---
+# --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Gmail SMTP_SSL on Port 465 to bypass Render blocks."""
-    msg = MIMEMultipart()
-    msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
-    msg['To'] = customer_email
-    msg['Subject'] = f"Order Confirmation: {order_id} - RCAPS4STREETS"
+    """Sends email via Brevo Web API (Bypasses Render network blocks)."""
+    if not BREVO_API_KEY:
+        print(">>> API ERROR: No BREVO_API_KEY found in Environment Variables!")
+        return
 
-    body = f"""
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    payload = {
+        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
+        "to": [
+            {"email": customer_email},
+            {"email": MAIL_USER} # Receipt copy for you
+        ],
+        "subject": f"Order Confirmation: {order_id} - RCAPS4STREETS",
+        "textContent": f"""
 Hello,
 
 This is a receipt for your order at RCAPS4STREETS.
@@ -54,22 +64,23 @@ Shipping to: {address}, {city}
 
 Thank you for shopping with us!
 """
-    msg.attach(MIMEText(body, 'plain'))
+    }
+    
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY
+    }
 
     try:
-        print(f">>> SMTP ATTEMPT: Connecting via SSL (Port 465) for Order {order_id}...")
-        # Using SMTP_SSL and Port 465 is the standard for bypassing 587 blocks
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
-        server.login(MAIL_USER, GMAIL_APP_PASSWORD)
-        
-        # Send to both customer and yourself
-        recipients = [customer_email, MAIL_USER]
-        server.sendmail(MAIL_USER, recipients, msg.as_string())
-        
-        server.quit()
-        print(">>> SUCCESS: Receipt sent via Gmail SSL!")
+        print(f">>> API ATTEMPT: Sending via Brevo for Order {order_id}...")
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 201:
+            print(">>> SUCCESS: Email sent successfully via Brevo API!")
+        else:
+            print(f">>> API FAILURE: {response.status_code} - {response.text}")
     except Exception as e:
-        print(f">>> SMTP FAILURE: {str(e)}")
+        print(f">>> API ERROR: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -223,7 +234,7 @@ def checkout():
         
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         
-        # Trigger the updated SMTP_SSL Email
+        # Trigger the Brevo API Email
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
 
         session.pop("cart", None)
