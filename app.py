@@ -33,12 +33,12 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Final Port 465 SSL Fix) ---
+# --- EMAIL CONFIG (Explicit Port 465 SSL Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=465,               # Use 465 for SSL
-    MAIL_USE_TLS=False,          # TLS must be False when using Port 465
-    MAIL_USE_SSL=True,           # SSL must be True
+    MAIL_PORT=465,
+    MAIL_USE_TLS=False,
+    MAIL_USE_SSL=True,
     MAIL_USERNAME=MAIL_USER,
     MAIL_PASSWORD=MAIL_PASS,
     MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER)
@@ -48,11 +48,11 @@ mail = Mail(app)
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            print(f">>> THREAD START: Sending email to {msg.recipients}")
+            print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 465...")
             mail.send(msg)
-            print(f">>> SUCCESS: Email sent successfully via Port 465!")
+            print(f">>> SUCCESS: Email sent successfully!")
         except Exception as e:
-            # Capture the exact error if SSL fails
+            # This captures the exact reason (Network, Auth, or Timeout)
             print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
@@ -207,11 +207,21 @@ def checkout():
         
         # --- PREPARE EMAIL ---
         msg = Message(
-            subject=f"Order {order_id} Confirmed - RCAPS4STREETS", 
+            subject=f"Order Confirmation: {order_id} - RCAPS4STREETS", 
             recipients=[customer_email, MAIL_USER]
         )
         
-        msg.body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you for shopping at RCAPS4STREETS!"
+        msg.body = f"""
+Hello,
+
+This is a receipt for your order at RCAPS4STREETS.
+
+Order ID: {order_id}
+Total: ₱{total_price}
+Shipping to: {customer_address}, {customer_city}
+
+We are processing your order now. Thank you!
+"""
 
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         threading.Thread(target=send_async_email, args=(app, msg)).start()
