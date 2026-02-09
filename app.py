@@ -6,17 +6,17 @@ from datetime import datetime
 from pymongo import MongoClient
 
 app = Flask(__name__)
-# Security setup
+# Security setup - Pulls from Render Environment Variables
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 # --- MONGODB CONFIG ---
-# Replace <db_password> with your actual database user password!
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://ultrainstinct1596321_db_user:<db_password>@cluster0.4yq7foc.mongodb.net/?appName=Cluster0")
+# Pulls the URI from Render. If not found, it uses a placeholder to prevent crashes.
+MONGO_URI = os.environ.get("MONGO_URI", "REPLACE_THIS_IN_RENDER_DASHBOARD")
 client = MongoClient(MONGO_URI)
-db = client['rcaps_database']  # Database name
-products_col = db['products']   # Collection for items
-orders_col = db['orders']       # Collection for sales
+db = client['rcaps_database']  
+products_col = db['products']   
+orders_col = db['orders']       
 
 # --- FILE CONFIG ---
 UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/images/products')
