@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests  # Replaces smtplib for better reliability on Render
 from werkzeug.utils import secure_filename
 import random, os, json, time
 from datetime import datetime
@@ -33,44 +31,45 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL VIA BREVO SMTP FUNCTION ---
+# --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo SMTP SSL. Increased timeout for slow cloud networks."""
+    """Sends email via Brevo API. Bypasses SMTP timeout issues on Render."""
     if not BREVO_API_KEY:
-        print(">>> SMTP ERROR: BREVO_API_KEY is missing!")
+        print(">>> API ERROR: BREVO_API_KEY is missing!")
         return
 
-    smtp_server = "smtp-relay.brevo.com"
-    smtp_port = 465 
+    url = "https://api.brevo.com/v3/smtp/email"
     
-    msg = MIMEMultipart()
-    msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
-    msg['To'] = customer_email
-    msg['Subject'] = f"Order Confirmation: {order_id}"
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY
+    }
 
-    body = f"Order Confirmation\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {address}, {city}"
-    msg.attach(MIMEText(body, 'plain'))
+    payload = {
+        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
+        "to": [{"email": customer_email}],
+        "subject": f"Order Confirmation: {order_id}",
+        "textContent": (
+            f"Order Confirmation\n\n"
+            f"Order ID: {order_id}\n"
+            f"Total: ₱{total_price}\n"
+            f"Address: {address}, {city}\n\n"
+            f"Thank you for shopping with us!"
+        ),
+        "bcc": [{"email": MAIL_USER}]  # Admin receives a copy automatically
+    }
 
     try:
-        print(f">>> SMTP ATTEMPT: Connecting to {smtp_server} via SSL...")
-        # Increased timeout to 25s because Render Free Tier can be slow
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=25)
+        print(f">>> API ATTEMPT: Sending request to Brevo for Order {order_id}...")
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
         
-        print(">>> SMTP: Logging in...")
-        server.login(MAIL_USER, BREVO_API_KEY)
-        
-        print(">>> SMTP: Sending message...")
-        server.send_message(msg)
-        
-        # Self copy for admin
-        msg['To'] = MAIL_USER
-        server.send_message(msg)
-        
-        server.quit()
-        print(">>> SUCCESS: Email sent via SSL!")
+        if response.status_code in [200, 201, 202]:
+            print(">>> SUCCESS: Email sent via API!")
+        else:
+            print(f">>> API FAILURE: Status {response.status_code} - {response.text}")
     except Exception as e:
-        # Prints specific error type to help us debug the timeout
-        print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
+        print(f">>> API EXCEPTION: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -160,6 +159,7 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
+        # Trigger API call
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
