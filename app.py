@@ -29,7 +29,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
-# --- EMAIL FUNCTION (Customer Receipt + Owner BCC) ---
+# --- EMAIL FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
     if not BREVO_API_KEY:
         print(">>> API ERROR: BREVO_API_KEY is missing!")
@@ -44,7 +44,7 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
-        "bcc": [{"email": MAIL_USER}], # Copy sent to you
+        "bcc": [{"email": MAIL_USER}], 
         "subject": f"Order Confirmation: {order_id}",
         "textContent": f"New Order Received!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nCustomer: {customer_email}\nAddress: {address}, {city}\n\nThank you!"
     }
@@ -66,16 +66,18 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
-    # Group products by ID for the cart view
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
-        p = products_col.find_one({"id": int(pid)}, {'_id': 0})
-        if p:
-            item = p.copy()
-            item['quantity'] = qty
-            cart_items.append(item)
-            total_price += p["price"] * qty
+        try:
+            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+            if p:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+        except:
+            continue
             
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
@@ -97,6 +99,7 @@ def remove_from_cart():
 @app.route("/empty-cart", methods=["POST"])
 def empty_cart():
     session.pop("cart", None)
+    session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
@@ -117,7 +120,6 @@ def checkout():
         city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
-        # Save order to MongoDB
         orders_col.insert_one({
             "order_id": order_id, 
             "email": customer_email,
@@ -127,7 +129,6 @@ def checkout():
             "date": datetime.now().strftime("%b %d, %Y")
         })
         
-        # Send Email Receipt (and BCC you)
         send_the_email(order_id, customer_email, total_price, address, city)
         
         session.pop("cart", None)
