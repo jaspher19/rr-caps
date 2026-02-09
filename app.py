@@ -1,111 +1,83 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests  # Replaces smtplib for better reliability on Render
+import requests
 from werkzeug.utils import secure_filename
-import random, os, json, time
+import random, os, time
 from datetime import datetime
+from pymongo import MongoClient
 
 app = Flask(__name__)
 # Security setup
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
-# --- PERSISTENT STORAGE CONFIG ---
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = '/data' if os.path.exists('/data') else BASE_DIR
+# --- MONGODB CONFIG ---
+# Replace <db_password> with your actual database user password!
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://ultrainstinct1596321_db_user:<db_password>@cluster0.4yq7foc.mongodb.net/?appName=Cluster0")
+client = MongoClient(MONGO_URI)
+db = client['rcaps_database']  # Database name
+products_col = db['products']   # Collection for items
+orders_col = db['orders']       # Collection for sales
 
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
-PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
-ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
+# --- FILE CONFIG ---
+UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/images/products')
+if not os.path.exists(UPLOAD_FOLDER): 
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # --- EMAIL CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
-if not os.path.exists(UPLOAD_FOLDER): 
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Initialize JSON files
-for file_path in [PRODUCT_FILE, ORDER_FILE]:
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            json.dump([], f)
-
 # --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo API. Bypasses SMTP timeout issues on Render."""
     if not BREVO_API_KEY:
         print(">>> API ERROR: BREVO_API_KEY is missing!")
         return
 
     url = "https://api.brevo.com/v3/smtp/email"
-    
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
         "api-key": BREVO_API_KEY
     }
-
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "subject": f"Order Confirmation: {order_id}",
-        "textContent": (
-            f"Order Confirmation\n\n"
-            f"Order ID: {order_id}\n"
-            f"Total: ₱{total_price}\n"
-            f"Address: {address}, {city}\n\n"
-            f"Thank you for shopping with us!"
-        ),
-        "bcc": [{"email": MAIL_USER}]  # Admin receives a copy automatically
+        "textContent": f"Order ID: {order_id}\nTotal: ₱{total_price}\nAddress: {address}, {city}\n\nThank you!",
+        "bcc": [{"email": MAIL_USER}]
     }
-
     try:
-        print(f">>> API ATTEMPT: Sending request to Brevo for Order {order_id}...")
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        
-        if response.status_code in [200, 201, 202]:
-            print(">>> SUCCESS: Email sent via API!")
-        else:
-            print(f">>> API FAILURE: Status {response.status_code} - {response.text}")
+        requests.post(url, json=payload, headers=headers, timeout=15)
+        print(">>> SUCCESS: Email request sent to Brevo!")
     except Exception as e:
         print(f">>> API EXCEPTION: {str(e)}")
-
-# --- UTILS ---
-def load_products():
-    try:
-        with open(PRODUCT_FILE, 'r') as f: return json.load(f)
-    except: return []
-
-def save_products(products):
-    with open(PRODUCT_FILE, 'w') as f: json.dump(products, f, indent=4)
-
-def load_orders():
-    try:
-        with open(ORDER_FILE, 'r') as f: return json.load(f)
-    except: return []
 
 # --- SHOP ROUTES ---
 
 @app.route("/")
 @app.route("/shop")
 def home():
-    return render_template("index.html", products=load_products(), cart_count=len(session.get("cart", [])))
+    # Fetch all products from MongoDB
+    all_products = list(products_col.find({}, {'_id': 0}))
+    return render_template("index.html", products=all_products, cart_count=len(session.get("cart", [])))
 
 @app.route("/cart")
 def view_cart():
-    products = load_products()
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    
     for pid, qty in counts.items():
-        for p in products:
-            if str(p["id"]) == pid:
-                item = p.copy()
-                item['quantity'] = qty
-                cart_items.append(item)
-                total_price += p["price"] * qty
+        # Find specific product in DB
+        p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+        if p:
+            item = p.copy()
+            item['quantity'] = qty
+            cart_items.append(item)
+            total_price += p["price"] * qty
+            
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
@@ -134,32 +106,33 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
-        products = load_products()
         checkout_items = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+        
         for pid, qty in counts.items():
-            for p in products:
-                if str(p["id"]) == pid:
-                    item = p.copy()
-                    item['quantity'] = qty
-                    checkout_items.append(item)
-                    total_price += p["price"] * qty
+            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+            if p:
+                item = p.copy()
+                item['quantity'] = qty
+                checkout_items.append(item)
+                total_price += p["price"] * qty
         
         customer_email = request.form.get("email")
         customer_address = request.form.get("address", "N/A")
         customer_city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
-        orders = load_orders()
-        orders.append({
-            "order_id": order_id, "email": customer_email,
-            "address": customer_address, "city": customer_city,
-            "total": total_price, "date": datetime.now().strftime("%b %d, %Y")
+        # Save Order to MongoDB
+        orders_col.insert_one({
+            "order_id": order_id, 
+            "email": customer_email,
+            "address": customer_address, 
+            "city": customer_city,
+            "total": total_price, 
+            "date": datetime.now().strftime("%b %d, %Y")
         })
-        with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # Trigger API call
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
@@ -174,7 +147,8 @@ def checkout():
 def admin():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    return render_template("admin.html", products=load_products(), admin_key=key)
+    all_products = list(products_col.find({}, {'_id': 0}))
+    return render_template("admin.html", products=all_products, admin_key=key)
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
@@ -189,8 +163,8 @@ def add_product():
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
         image_path = f"images/products/{unique_name}"
     
-    products = load_products()
-    products.append({
+    # Save Product to MongoDB
+    products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
         "price": int(request.form.get("price", 0)),
@@ -198,15 +172,14 @@ def add_product():
         "badge": request.form.get("badge"),
         "category": request.form.get("category")
     })
-    save_products(products)
     return redirect(url_for('admin', key=key))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    products = [p for p in load_products() if p['id'] != product_id]
-    save_products(products)
+    # Remove from MongoDB
+    products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":

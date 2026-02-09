@@ -18,3 +18,4 @@ Flask
 requests
 gunicorn
 werkzeug
+pymongo[srv]
