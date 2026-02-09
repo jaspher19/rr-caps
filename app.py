@@ -33,25 +33,29 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Explicit Port 465 SSL Fix) ---
+# --- EMAIL CONFIG (Alternative Port 587 Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=465,
-    MAIL_USE_TLS=False,
-    MAIL_USE_SSL=True,
+    MAIL_PORT=587,               # Using 587 to bypass Port 465 blocks
+    MAIL_USE_TLS=True,            # TLS must be True for 587
+    MAIL_USE_SSL=False,
     MAIL_USERNAME=MAIL_USER,
     MAIL_PASSWORD=MAIL_PASS,
     MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER)
 )
+# Added timeout to prevent the app from freezing on network blocks
+app.config['MAIL_TIMEOUT'] = 15
+
 mail = Mail(app)
 
 def send_the_email(msg):
-    """Removed background threading to ensure the email sends before the page loads."""
+    """Synchronous send to capture direct network feedback in logs."""
     try:
-        print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 465...")
+        print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 587...")
         mail.send(msg)
         print(f">>> SUCCESS: Email sent successfully!")
     except Exception as e:
+        # This will tell us if Port 587 is also blocked (Errno 101)
         print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
@@ -214,7 +218,7 @@ def checkout():
 
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         
-        # FIX: Call directly instead of using a Thread
+        # Synchronous call
         send_the_email(msg)
 
         session.pop("cart", None)
