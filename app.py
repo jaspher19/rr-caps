@@ -25,7 +25,7 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Port 587 Fix) ---
+# --- EMAIL CONFIG ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -126,10 +126,10 @@ def view_cart():
     products = load_products()
     cart_ids = session.get("cart", [])
     
-    # Process the cart to group duplicates and calculate price
     cart_items = []
     total_price = 0
-    counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
+    # Counts instances of each product ID
+    counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
         for p in products:
@@ -152,8 +152,8 @@ def add_to_cart():
 def remove_from_cart():
     product_id = request.form.get("product_id")
     if "cart" in session:
-        if product_id in session["cart"]:
-            session["cart"].remove(product_id)
+        if str(product_id) in session["cart"]:
+            session["cart"].remove(str(product_id))
             session.modified = True
     return redirect(url_for('view_cart'))
 
@@ -163,30 +163,7 @@ def empty_cart():
     return redirect(url_for('view_cart'))
 
 # --- CHECKOUT ---
-# --- ADD THIS SECTION ---
 
-@app.route("/cart")
-def view_cart():
-    products = load_products()
-    cart_ids = session.get("cart", [])
-    
-    # Process the cart to group duplicates and calculate price
-    cart_items = []
-    total_price = 0
-    # Convert IDs to strings to ensure matching works
-    counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
-    
-    for pid, qty in counts.items():
-        for p in products:
-            if str(p["id"]) == pid:
-                item = p.copy()
-                item['quantity'] = qty
-                cart_items.append(item)
-                total_price += p["price"] * qty
-                
-    return render_template("cart.html", cart=cart_items, total_price=total_price)
-
-# -----------------------
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
@@ -197,7 +174,7 @@ def checkout():
         checkout_items = []
         total_price = 0
         
-        counts = {str(cid): cart_ids.count(cid) for cid in set(cart_ids)}
+        counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         for pid, qty in counts.items():
             for p in products:
                 if str(p["id"]) == pid:
@@ -220,6 +197,7 @@ def checkout():
             "total": total_price,
             "date": datetime.now().strftime("%b %d, %Y")
         })
+        save_products = [] # This line in original was wrong, we use with open:
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
         msg = Message(subject=f"Order {order_id} Confirmed", 
