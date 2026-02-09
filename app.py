@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests 
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -8,6 +7,7 @@ import random, os, json, time
 from datetime import datetime
 
 app = Flask(__name__)
+# Security setup
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
@@ -33,14 +33,13 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- FIXED EMAIL FUNCTION (PORT 465 + SSL) ---
+# --- EMAIL VIA BREVO SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
     """Sends email via Brevo SMTP SSL. Optimized to prevent Render timeouts."""
     if not BREVO_API_KEY:
-        print(">>> SMTP ERROR: BREVO_API_KEY is missing from Env Vars!")
+        print(">>> SMTP ERROR: BREVO_API_KEY is missing!")
         return
 
-    # Configuration for SSL
     smtp_server = "smtp-relay.brevo.com"
     smtp_port = 465 
     
@@ -53,21 +52,19 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> SMTP ATTEMPT: Connecting to {smtp_server} via SSL...")
-        # timeout=10 is CRITICAL. It stops the app from hanging if the connection is slow.
+        print(f">>> SMTP ATTEMPT: Connecting via SSL...")
+        # timeout=10 ensures the app doesn't hang forever
         server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
         server.login(MAIL_USER, BREVO_API_KEY)
         server.send_message(msg)
         
-        # Admin copy
+        # Self copy for the admin
         msg['To'] = MAIL_USER
         server.send_message(msg)
-        
         server.quit()
         print(">>> SUCCESS: Email sent via SSL!")
     except Exception as e:
-        # We catch the error so the website doesn't crash for the customer
-        print(f">>> SMTP FAILURE (Non-Critical): {str(e)}")
+        print(f">>> SMTP FAILURE: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -90,11 +87,36 @@ def load_orders():
 def home():
     return render_template("index.html", products=load_products(), cart_count=len(session.get("cart", [])))
 
-@app.route("/admin")
-def admin():
-    key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    return render_template("admin.html", products=load_products(), admin_key=key)
+@app.route("/cart")
+def view_cart():
+    products = load_products()
+    cart_ids = session.get("cart", [])
+    cart_items = []
+    total_price = 0
+    counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    for pid, qty in counts.items():
+        for p in products:
+            if str(p["id"]) == pid:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+    return render_template("cart.html", cart=cart_items, total_price=total_price)
+
+@app.route("/add-to-cart", methods=["POST"])
+def add_to_cart():
+    if "cart" not in session: session["cart"] = []
+    session["cart"].append(str(request.form.get("id")))
+    session.modified = True
+    return jsonify({"status": "success", "cart_count": len(session["cart"])})
+
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    product_id = request.form.get("product_id")
+    if "cart" in session and str(product_id) in session["cart"]:
+        session["cart"].remove(str(product_id))
+        session.modified = True
+    return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
@@ -127,7 +149,6 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # Trigger email without crashing the request
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
@@ -136,13 +157,36 @@ def checkout():
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
 
-# Include your add-to-cart, remove, etc. routes below...
-@app.route("/add-to-cart", methods=["POST"])
-def add_to_cart():
-    if "cart" not in session: session["cart"] = []
-    session["cart"].append(str(request.form.get("id")))
-    session.modified = True
-    return jsonify({"status": "success", "cart_count": len(session["cart"])})
+# --- ADMIN ROUTES ---
+@app.route("/admin")
+def admin():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    return render_template("admin.html", products=load_products(), admin_key=key)
+
+@app.route("/admin/add", methods=["POST"])
+def add_product():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    file = request.files.get("photo")
+    image_path = "images/products/default.jpg"
+    if file:
+        filename = secure_filename(file.filename)
+        unique_name = f"{int(time.time())}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+        image_path = f"images/products/{unique_name}"
+    
+    products = load_products()
+    products.append({
+        "id": int(time.time()), 
+        "name": request.form.get("name"),
+        "price": int(request.form.get("price", 0)),
+        "image": image_path,
+        "badge": request.form.get("badge"),
+        "category": request.form.get("category")
+    })
+    save_products(products)
+    return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":
     app.run(debug=True)
