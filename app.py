@@ -20,12 +20,11 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# --- EMAIL CONFIG (CLEANED) ---
+# --- EMAIL CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 
-# GitHub Push Protection fix: The key is now EXCLUSIVELY pulled from Render Environment Variables
-# Make sure to add 'BREVO_API_KEY' in the Render Dashboard -> Environment tab
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
+# UPDATED: Using your new Brevo API Key directly
+BREVO_API_KEY = "xsmtpsib-c6a9842782919ca251ec04b43e9da3d27a9c1d664d6deebf1612b7d50752cc12-elB5dUgQiRvxekv0"
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -40,8 +39,8 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 # --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
     """Sends email via Brevo Web API (Bypasses Render network blocks)."""
-    if not BREVO_API_KEY:
-        print(">>> API ERROR: No BREVO_API_KEY found in Environment Variables!")
+    if not BREVO_API_KEY or "xsmtp" not in BREVO_API_KEY:
+        print(">>> API ERROR: Invalid or Missing BREVO_API_KEY!")
         return
 
     url = "https://api.brevo.com/v3/smtp/email"
