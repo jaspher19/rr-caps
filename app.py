@@ -142,14 +142,23 @@ def checkout():
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    # Fetch password from Env or use default
+    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
+    if key != actual_pass: 
+        return "Unauthorized", 403
+    
+    # We fetch products AND orders to keep the admin panel fully functional
     all_products = list(products_col.find({}, {'_id': 0}))
-    return render_template("admin.html", products=all_products, admin_key=key)
+    all_orders = list(orders_col.find({}, {'_id': 0}).sort("date", -1))
+    
+    return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
     key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
+    if key != actual_pass: return "Unauthorized", 403
+    
     file = request.files.get("photo")
     image_path = "images/products/default.jpg"
     if file:
@@ -171,7 +180,9 @@ def add_product():
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
     key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
+    if key != actual_pass: return "Unauthorized", 403
+    
     products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
