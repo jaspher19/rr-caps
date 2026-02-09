@@ -19,3 +19,5 @@ requests
 gunicorn
 werkzeug
 pymongo[srv]
+dnspython
+certifi
