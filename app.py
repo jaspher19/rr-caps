@@ -11,7 +11,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 # --- MONGODB CONFIG ---
-# Pulls the URI from Render. If not found, it uses a placeholder to prevent crashes.
+# Pulls the URI from Render. Ensure MONGO_URI is added in Render settings.
 MONGO_URI = os.environ.get("MONGO_URI", "REPLACE_THIS_IN_RENDER_DASHBOARD")
 client = MongoClient(MONGO_URI)
 db = client['rcaps_database']  
@@ -58,6 +58,7 @@ def send_the_email(order_id, customer_email, total_price, address, city):
 @app.route("/")
 @app.route("/shop")
 def home():
+    # Pulls directly from MongoDB (Recalls storage on load)
     all_products = list(products_col.find({}, {'_id': 0}))
     return render_template("index.html", products=all_products, cart_count=len(session.get("cart", [])))
 
@@ -121,6 +122,7 @@ def checkout():
         customer_city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
+        # Saves order to MongoDB permanent storage
         orders_col.insert_one({
             "order_id": order_id, 
             "email": customer_email,
@@ -160,6 +162,7 @@ def add_product():
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
         image_path = f"images/products/{unique_name}"
     
+    # Saves new product to MongoDB
     products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
