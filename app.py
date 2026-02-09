@@ -39,7 +39,6 @@ app.config.update(
     MAIL_USE_TLS=True,
     MAIL_USE_SSL=False,
     MAIL_USERNAME=SHOP_EMAIL,
-    # The password must have NO spaces
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL,
     MAIL_MAX_EMAILS=None,
@@ -54,7 +53,6 @@ def send_async_email(app, msg):
             mail.send(msg)
             print(f">>> SUCCESS: Receipt sent to {msg.recipients}")
         except Exception as e:
-            # Check Render Logs for this output if it still fails
             print(f">>> CRITICAL MAIL ERROR: {str(e)}")
 
 # --- UTILS ---
@@ -192,7 +190,10 @@ def checkout():
         customer_email = request.form.get("email")
         customer_address = request.form.get("address", "N/A")
         customer_city = request.form.get("city", "N/A")
-        order_id = f"RR-{random.randint(1000, 9999)}"
+
+        # --- UPDATED ORDER ID FORMAT (RCAPS-2026-XXXX) ---
+        current_year = datetime.now().year
+        order_id = f"RCAPS-{current_year}-{random.randint(1000, 9999)}"
         
         orders = load_orders()
         orders.append({
@@ -205,13 +206,24 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # --- PREPARE EMAIL ---
-        msg = Message(subject=f"Order {order_id} Confirmed - R-CAPS", 
+        # --- PREPARE EMAIL WITH BRANDED TEXT ---
+        msg = Message(subject=f"Order {order_id} Confirmed - RCAPS4STREETS", 
                       recipients=[customer_email, SHOP_EMAIL])
         
-        msg.body = f"Order Confirmation\n------------------\nOrder ID: {order_id}\nTotal: ₱{total_price}\nShipping: {customer_address}, {customer_city}\n\nThank you for shopping!"
+        msg.body = f"""
+Order Confirmation from RCAPS4STREETS
+------------------------------------
+Order ID: {order_id}
+Total Amount: ₱{total_price}
 
-        # Use threading to prevent the page from hanging while sending
+Shipping Details:
+{customer_address}
+{customer_city}
+
+Thank you for shopping with RCAPS4STREETS! We are processing your order now.
+"""
+
+        # Run in thread so the user doesn't wait
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         session.pop("cart", None)
