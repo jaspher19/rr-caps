@@ -7,6 +7,7 @@ from pymongo import MongoClient
 import certifi
 
 app = Flask(__name__)
+# The secret key encrypts the session cookie so users can't modify their own cart data
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
@@ -35,7 +36,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     
-    # Create the itemized list for the email body
     items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}" for item in items_list])
     
     email_body = (
@@ -69,14 +69,19 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
 @app.route("/shop")
 def home():
     all_products = list(products_col.find({}, {'_id': 0}))
-    return render_template("index.html", products=all_products, cart_count=len(session.get("cart", [])))
+    # Get count of total items in the user's private session cart
+    cart_count = len(session.get("cart", []))
+    return render_template("index.html", products=all_products, cart_count=cart_count)
 
 @app.route("/cart")
 def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
+    
+    # Count occurrences of each ID in the session list
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    
     for pid, qty in counts.items():
         try:
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
@@ -90,17 +95,29 @@ def view_cart():
 
 @app.route("/add-to-cart", methods=["POST"])
 def add_to_cart():
-    if "cart" not in session: session["cart"] = []
-    session["cart"].append(str(request.form.get("id")))
-    session.modified = True
+    # Initialize a new list in this user's session if it doesn't exist
+    if "cart" not in session:
+        session["cart"] = []
+    
+    product_id = request.form.get("id")
+    if product_id:
+        # We must re-assign the session variable to trigger the 'modified' flag
+        cart = session["cart"]
+        cart.append(str(product_id))
+        session["cart"] = cart
+        session.modified = True
+        
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
 
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
     product_id = request.form.get("product_id")
-    if "cart" in session and str(product_id) in session["cart"]:
-        session["cart"].remove(str(product_id))
-        session.modified = True
+    if "cart" in session:
+        cart = session["cart"]
+        if str(product_id) in cart:
+            cart.remove(str(product_id))
+            session["cart"] = cart
+            session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/empty-cart", methods=["POST"])
@@ -128,7 +145,6 @@ def checkout():
                     "qty": qty
                 })
         
-        # Pulling the new Phone and Description fields
         customer_email = request.form.get("email")
         phone = request.form.get("phone", "N/A")
         address = request.form.get("address", "N/A")
@@ -151,6 +167,7 @@ def checkout():
         
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
         
+        # Clear only this specific customer's cart after successful purchase
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, total=total_price, email=customer_email)
     except Exception as e:
@@ -193,7 +210,7 @@ def add_product():
 def edit_price(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    new_price = request.form.get("price")
+    new_price = request.form.get("new_price") # Fixed to match HTML input name
     products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
     return redirect(url_for('admin', key=key))
 
@@ -205,7 +222,6 @@ def delete_product(product_id):
     return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":
-    app.run(debug=True)
-    # Get port from environment variable, default to 5000 for local testing
+    # Get port from environment variable for Render deployment
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)

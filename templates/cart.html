@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
-    input::placeholder { color: #4b5563; }
+    input::placeholder, textarea::placeholder { color: #4b5563; }
     
     .loader {
       border: 2px solid #f3f3f3;
@@ -21,6 +21,9 @@
       margin-right: 8px;
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Clean mobile inputs */
+    input, textarea { -webkit-appearance: none; border-radius: 0; }
   </style>
 </head>
 
@@ -90,21 +93,29 @@
 
       <form id="checkout-form" action="{{ url_for('checkout') }}" method="POST" class="space-y-10">
         <div class="border-t border-white/10 pt-10">
-          <h3 class="text-[10px] tracking-[0.3em] uppercase mb-8 text-white font-bold">Shipping Details</h3>
+          <h3 class="text-[10px] tracking-[0.3em] uppercase mb-8 text-white font-bold">Contact & Shipping</h3>
           
           <div class="space-y-4">
-            <input type="email" name="email" id="email" placeholder="EMAIL ADDRESS" required 
-                   class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition rounded-none appearance-none">
-            
-            <input type="text" name="address" id="address" placeholder="STREET ADDRESS / HOUSE NUMBER" required 
-                   class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition rounded-none appearance-none">
-            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input type="text" name="city" id="city" placeholder="CITY" required 
-                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition rounded-none appearance-none">
-                <input type="text" name="zip" id="zip" placeholder="ZIP CODE" required 
-                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition rounded-none appearance-none">
+              <input type="email" name="email" placeholder="EMAIL ADDRESS" required 
+                     class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+              
+              <input type="tel" name="phone" placeholder="PHONE NUMBER (E.G. 0912...)" required 
+                     class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
             </div>
+
+            <input type="text" name="address" placeholder="STREET ADDRESS / HOUSE NUMBER" required 
+                   class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <input type="text" name="city" placeholder="CITY" required 
+                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+                <input type="text" name="zip" placeholder="ZIP CODE" required 
+                       class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
+            </div>
+
+            <textarea name="description" rows="3" placeholder="ORDER NOTES (OPTIONAL: SIZE, COLOR, OR DELIVERY INSTRUCTIONS)" 
+                      class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition resize-none"></textarea>
           </div>
         </div>
 
