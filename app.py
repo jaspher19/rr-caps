@@ -18,10 +18,11 @@ PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # --- EMAIL CONFIG ---
-# Using your verified Brevo sender email
 SENDER_EMAIL = "ultrainstinct1596321@gmail.com"
-# Your new API Key applied here
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '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')
+
+# FIXED: Removed the hardcoded key to pass GitHub Push Protection.
+# You will set this value in the Render Dashboard Environment Variables.
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -37,7 +38,7 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 def send_the_email(order_id, customer_email, total_price, address, city):
     """Sends email via Brevo API. This bypasses the SMTP port block on Render."""
     if not BREVO_API_KEY:
-        print(">>> API ERROR: BREVO_API_KEY is missing!")
+        print(">>> API ERROR: BREVO_API_KEY is missing from environment variables!")
         return
 
     url = "https://api.brevo.com/v3/smtp/email"
