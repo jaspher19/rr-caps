@@ -21,7 +21,9 @@ ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # API & Email Config
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
-BREVO_API_KEY = "xsmtpsib-08c9a2e8aeb217277ffcaa007c3d69a00507276d0c7d29a9ae6437df0290f0bb-uCPikSTcOEywE8GF"
+
+# BEST PRACTICE: Try to get from environment first, otherwise use the new key provided
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', 'xsmtpsib-08c9a2e8aeb217277ffcaa007c3d69a00507276d0c7d29a9ae6437df0290f0bb-c2Wm8ui9XNb2R0ZQ')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
