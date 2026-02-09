@@ -35,7 +35,7 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA BREVO SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo SMTP SSL. Optimized to prevent Render timeouts."""
+    """Sends email via Brevo SMTP SSL. Increased timeout for slow cloud networks."""
     if not BREVO_API_KEY:
         print(">>> SMTP ERROR: BREVO_API_KEY is missing!")
         return
@@ -52,18 +52,25 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> SMTP ATTEMPT: Connecting via SSL...")
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
+        print(f">>> SMTP ATTEMPT: Connecting to {smtp_server} via SSL...")
+        # Increased timeout to 25s because Render Free Tier can be slow
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=25)
+        
+        print(">>> SMTP: Logging in...")
         server.login(MAIL_USER, BREVO_API_KEY)
+        
+        print(">>> SMTP: Sending message...")
         server.send_message(msg)
         
         # Self copy for admin
         msg['To'] = MAIL_USER
         server.send_message(msg)
+        
         server.quit()
         print(">>> SUCCESS: Email sent via SSL!")
     except Exception as e:
-        print(f">>> SMTP FAILURE: {str(e)}")
+        # Prints specific error type to help us debug the timeout
+        print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -128,7 +135,7 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
-        products = load_products() # Fixed here
+        products = load_products()
         checkout_items = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
