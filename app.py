@@ -35,48 +35,46 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA BREVO SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo SMTP Relay."""
+    """Sends email via Brevo SMTP SSL (Port 465) to prevent Render timeouts."""
     if not BREVO_API_KEY:
-        print(">>> SMTP ERROR: BREVO_API_KEY is EMPTY in environment variables!")
+        print(">>> SMTP ERROR: BREVO_API_KEY is EMPTY!")
         return
 
+    # Using Port 465 (SSL) is usually more stable on Render than 587
     smtp_server = "smtp-relay.brevo.com"
-    smtp_port = 587
+    smtp_port = 465 
     
     msg = MIMEMultipart()
     msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
     msg['To'] = customer_email
     msg['Subject'] = f"Order Confirmation: {order_id} - RCAPS4STREETS"
 
-    body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {address}, {city}\n\nThank you for shopping!"
+    body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {address}, {city}\n\nThank you for shopping with us!"
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> SMTP ATTEMPT: Sending for Order {order_id}...")
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls() 
+        print(f">>> SMTP ATTEMPT: Connecting via SSL to {smtp_server}...")
+        # Added timeout=10 to prevent the entire app from hanging if connection is slow
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10)
         
-        # LOGIN WITH ERROR CHECK
         try:
             server.login(MAIL_USER, BREVO_API_KEY)
         except smtplib.SMTPAuthenticationError:
-            print(">>> SMTP AUTH FAILURE: Your BREVO_API_KEY is incorrect or SMTP is disabled in Brevo settings.")
+            print(">>> SMTP AUTH FAILURE: Check if your API Key is correct and SMTP is enabled in Brevo.")
             return
 
         server.send_message(msg)
         
-        # Self-copy
+        # Send a copy to yourself
         msg['To'] = MAIL_USER
         server.send_message(msg)
         
         server.quit()
-        print(">>> SUCCESS: Email sent successfully via SMTP!")
+        print(">>> SUCCESS: Email sent successfully via SMTP SSL!")
     except Exception as e:
-        print(f">>> SMTP GENERAL FAILURE: {str(e)}")
+        print(f">>> SMTP FAILURE: {str(e)}")
 
-# --- REST OF YOUR ROUTES (UTILITIES, HOME, CART, CHECKOUT, etc.) ---
-# ... [Keep your existing routes exactly as they are in your previous snippet] ...
-
+# --- UTILS ---
 def load_products():
     try:
         with open(PRODUCT_FILE, 'r') as f: return json.load(f)
@@ -90,6 +88,8 @@ def load_orders():
         with open(ORDER_FILE, 'r') as f: return json.load(f)
     except: return []
 
+# --- ROUTES ---
+
 @app.route("/")
 @app.route("/shop")
 def home():
@@ -100,6 +100,7 @@ def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
+        
         products = load_products()
         checkout_items = []
         total_price = 0
@@ -125,14 +126,16 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
+        # This function now uses SSL to avoid timeouts
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
+        
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, items=checkout_items, total=total_price, email=customer_email, address=customer_address, city=customer_city)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
 
-# (Add your other admin/cart routes here from your original code)
+# Include your Admin and Cart routes here...
 
 if __name__ == "__main__":
     app.run(debug=True)
