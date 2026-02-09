@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests  # Required for the API fix
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from werkzeug.utils import secure_filename
 import random, os, json, time
 from datetime import datetime
@@ -19,11 +21,10 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# API & Email Config
+# --- GMAIL SMTP CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
-
-# SECURE FIX: We fetch the key from Render's environment, not from this file!
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
+# Your specific App Password
+GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'jmjfvzcpaxfwxmvp')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -35,19 +36,15 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL VIA API FUNCTION ---
+# --- EMAIL VIA SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo Web API to bypass Render network blocks."""
-    url = "https://api.brevo.com/v3/smtp/email"
-    
-    payload = {
-        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
-        "to": [
-            {"email": customer_email},
-            {"email": MAIL_USER} # Carbon copy to yourself
-        ],
-        "subject": f"Order Confirmation: {order_id} - RCAPS4STREETS",
-        "textContent": f"""
+    """Sends email via Gmail SMTP (Replacing Brevo API)."""
+    msg = MIMEMultipart()
+    msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
+    msg['To'] = customer_email
+    msg['Subject'] = f"Order Confirmation: {order_id} - RCAPS4STREETS"
+
+    body = f"""
 Hello,
 
 This is a receipt for your order at RCAPS4STREETS.
@@ -58,23 +55,23 @@ Shipping to: {address}, {city}
 
 Thank you for shopping with us!
 """
-    }
-    
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": BREVO_API_KEY
-    }
+    msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> API ATTEMPT: Sending via Brevo for Order {order_id}...")
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        if response.status_code == 201:
-            print(">>> SUCCESS: Email sent successfully via Web API!")
-        else:
-            print(f">>> API FAILURE: {response.status_code} - {response.text}")
+        print(f">>> SMTP ATTEMPT: Sending via Gmail for Order {order_id}...")
+        # Connecting to Gmail SMTP server
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()  # Upgrade connection to secure
+        server.login(MAIL_USER, GMAIL_APP_PASSWORD)
+        
+        # Send to customer and CC yourself
+        recipients = [customer_email, MAIL_USER]
+        server.sendmail(MAIL_USER, recipients, msg.as_string())
+        
+        server.quit()
+        print(">>> SUCCESS: Email sent successfully via Gmail SMTP!")
     except Exception as e:
-        print(f">>> API ERROR: {str(e)}")
+        print(f">>> SMTP FAILURE: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -228,7 +225,7 @@ def checkout():
         
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         
-        # Trigger the API Email
+        # Trigger the Direct Gmail Email
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
 
         session.pop("cart", None)
