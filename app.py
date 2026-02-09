@@ -5,16 +5,12 @@ import random, os, json, time
 from datetime import datetime
 
 app = Flask(__name__)
-# Pulls from Render Env; uses fallback only for local development
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 # --- PERSISTENT STORAGE CONFIG ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-if os.path.exists('/data'):
-    DATA_DIR = '/data'
-else:
-    DATA_DIR = BASE_DIR
+DATA_DIR = '/data' if os.path.exists('/data') else BASE_DIR
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
@@ -23,8 +19,8 @@ ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 # --- EMAIL CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 
-# UPDATED: Using your new Brevo API Key directly
-BREVO_API_KEY = "xsmtpsib-c6a9842782919ca251ec04b43e9da3d27a9c1d664d6deebf1612b7d50752cc12-elB5dUgQiRvxekv0"
+# SAFE METHOD: Pulling from Render's Environment Variables
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -38,9 +34,12 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo Web API (Bypasses Render network blocks)."""
-    if not BREVO_API_KEY or "xsmtp" not in BREVO_API_KEY:
-        print(">>> API ERROR: Invalid or Missing BREVO_API_KEY!")
+    """Sends email via Brevo Web API."""
+    # DEBUG LINE: This helps us see if the key is loaded without showing the whole key
+    if BREVO_API_KEY:
+        print(f">>> DEBUG: Key loaded. Starts with: {BREVO_API_KEY[:8]}")
+    else:
+        print(">>> API ERROR: BREVO_API_KEY is EMPTY in environment variables!")
         return
 
     url = "https://api.brevo.com/v3/smtp/email"
@@ -49,20 +48,10 @@ def send_the_email(order_id, customer_email, total_price, address, city):
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [
             {"email": customer_email},
-            {"email": MAIL_USER} # Receipt copy for you
+            {"email": MAIL_USER}
         ],
         "subject": f"Order Confirmation: {order_id} - RCAPS4STREETS",
-        "textContent": f"""
-Hello,
-
-This is a receipt for your order at RCAPS4STREETS.
-
-Order ID: {order_id}
-Total: ₱{total_price}
-Shipping to: {address}, {city}
-
-Thank you for shopping with us!
-"""
+        "textContent": f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {address}, {city}"
     }
     
     headers = {
@@ -75,7 +64,7 @@ Thank you for shopping with us!
         print(f">>> API ATTEMPT: Sending via Brevo for Order {order_id}...")
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         if response.status_code == 201:
-            print(">>> SUCCESS: Email sent successfully via Brevo API!")
+            print(">>> SUCCESS: Email sent successfully!")
         else:
             print(f">>> API FAILURE: {response.status_code} - {response.text}")
     except Exception as e:
@@ -112,7 +101,6 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    
     file = request.files.get("photo")
     image_path = "images/products/default.jpg"
     if file:
@@ -154,8 +142,6 @@ def order_history():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     return render_template("orders.html", orders=load_orders(), admin_key=key)
 
-# --- CART ---
-
 @app.route("/cart")
 def view_cart():
     products = load_products()
@@ -163,7 +149,6 @@ def view_cart():
     cart_items = []
     total_price = 0
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
-    
     for pid, qty in counts.items():
         for p in products:
             if str(p["id"]) == pid:
@@ -193,14 +178,11 @@ def empty_cart():
     session.pop("cart", None)
     return redirect(url_for('view_cart'))
 
-# --- CHECKOUT ---
-
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
-        
         products = load_products()
         checkout_items = []
         total_price = 0
@@ -216,36 +198,19 @@ def checkout():
         customer_email = request.form.get("email")
         customer_address = request.form.get("address", "N/A")
         customer_city = request.form.get("city", "N/A")
-
-        current_year = datetime.now().year
-        order_id = f"RCAPS-{current_year}-{random.randint(1000, 9999)}"
+        order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
         orders = load_orders()
         orders.append({
-            "order_id": order_id, 
-            "email": customer_email,
-            "address": customer_address,
-            "city": customer_city,
-            "total": total_price,
-            "date": datetime.now().strftime("%b %d, %Y")
+            "order_id": order_id, "email": customer_email,
+            "address": customer_address, "city": customer_city,
+            "total": total_price, "date": datetime.now().strftime("%b %d, %Y")
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
-        
-        # Trigger the Brevo API Email
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
-
         session.pop("cart", None)
-        session.modified = True
-
-        return render_template("success.html", 
-                               order_id=order_id, 
-                               items=checkout_items, 
-                               total=total_price, 
-                               email=customer_email, 
-                               address=customer_address, 
-                               city=customer_city)
+        return render_template("success.html", order_id=order_id, items=checkout_items, total=total_price, email=customer_email, address=customer_address, city=customer_city)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
