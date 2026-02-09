@@ -108,19 +108,30 @@
 
     <div class="bg-[#0F0F0F] border border-white/5 rounded-3xl p-8 lg:p-12">
         <h2 class="text-xl font-black uppercase tracking-tighter mb-8">Active Inventory</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 gap-4">
             {% for product in products %}
-            <div class="bg-black border border-white/10 p-4 rounded-2xl flex items-center justify-between group">
-                <div class="flex items-center gap-4">
+            <div class="bg-black border border-white/10 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 group">
+                <div class="flex items-center gap-4 w-full sm:w-auto">
                     <img src="{{ url_for('static', filename=product.image) }}" class="w-12 h-12 object-contain bg-[#111] rounded-lg">
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-wide">{{ product.name }}</p>
-                        <p class="text-[9px] text-gray-500 uppercase">₱{{ product.price }}</p>
+                        <p class="text-[9px] text-gray-500 uppercase">Current: ₱{{ product.price }}</p>
                     </div>
                 </div>
-                <form action="{{ url_for('delete_product', product_id=product.id, key=admin_key) }}" method="POST" onsubmit="return confirm('Delete this product?');">
-                    <button type="submit" class="text-red-900 group-hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
-                </form>
+
+                <div class="flex items-center gap-4 w-full sm:w-auto justify-end">
+                    <form action="{{ url_for('edit_price', product_id=product.id, key=admin_key) }}" method="POST" class="flex items-center gap-2">
+                        <input type="number" name="new_price" placeholder="₱ New" required 
+                            class="bg-[#111] border border-white/5 rounded-lg py-2 px-3 text-[10px] text-white outline-none focus:border-white/20 w-24">
+                        <button type="submit" class="bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-lg transition-all">
+                            Sync
+                        </button>
+                    </form>
+
+                    <form action="{{ url_for('delete_product', product_id=product.id, key=admin_key) }}" method="POST" onsubmit="return confirm('Delete this product?');">
+                        <button type="submit" class="text-red-900 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
+                    </form>
+                </div>
             </div>
             {% else %}
             <p class="text-gray-600 text-[10px] uppercase tracking-widest py-4">No products currently live.</p>
@@ -133,11 +144,9 @@
             <h2 class="text-red-500 text-lg font-black uppercase tracking-tighter">Wipe Storefront</h2>
             <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Permanently remove all products from the catalog.</p>
         </div>
-        <form onsubmit="alert('Function temporarily disabled. Add the route to app.py first.'); return false;">
-            <button type="submit" class="bg-gray-800 text-gray-500 py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] cursor-not-allowed">
-                Wipe Unavailable
-            </button>
-        </form>
+        <button class="bg-gray-800 text-gray-500 py-4 px-8 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] cursor-not-allowed">
+            Wipe Unavailable
+        </button>
     </div>
 
   </div>

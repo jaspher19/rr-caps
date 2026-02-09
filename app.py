@@ -58,7 +58,6 @@ def send_the_email(order_id, customer_email, total_price, address, city):
 @app.route("/")
 @app.route("/shop")
 def home():
-    # Fetch all products from MongoDB
     all_products = list(products_col.find({}, {'_id': 0}))
     return render_template("index.html", products=all_products, cart_count=len(session.get("cart", [])))
 
@@ -70,7 +69,6 @@ def view_cart():
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
-        # Find specific product in DB
         p = products_col.find_one({"id": int(pid)}, {'_id': 0})
         if p:
             item = p.copy()
@@ -123,7 +121,6 @@ def checkout():
         customer_city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
-        # Save Order to MongoDB
         orders_col.insert_one({
             "order_id": order_id, 
             "email": customer_email,
@@ -163,7 +160,6 @@ def add_product():
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
         image_path = f"images/products/{unique_name}"
     
-    # Save Product to MongoDB
     products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
@@ -174,11 +170,23 @@ def add_product():
     })
     return redirect(url_for('admin', key=key))
 
+@app.route("/admin/edit_price/<int:product_id>", methods=["POST"])
+def edit_price(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
+    new_price = request.form.get("new_price")
+    if new_price:
+        products_col.update_one(
+            {"id": product_id}, 
+            {"$set": {"price": int(new_price)}}
+        )
+    return redirect(url_for('admin', key=key))
+
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    # Remove from MongoDB
     products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
