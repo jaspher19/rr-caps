@@ -33,7 +33,7 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Strictly using Environment Variables) ---
+# --- EMAIL CONFIG ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -41,19 +41,20 @@ app.config.update(
     MAIL_USE_SSL=False,
     MAIL_USERNAME=MAIL_USER,
     MAIL_PASSWORD=MAIL_PASS,
-    MAIL_DEFAULT_SENDER=( "RCAPS4STREETS", MAIL_USER) # Added Display Name
+    MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER) 
 )
 mail = Mail(app)
 
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            print(f">>> SMTP ATTEMPT: Using {MAIL_USER}")
+            # We print this inside the thread to confirm it started
+            print(f">>> THREAD START: Sending email to {msg.recipients}")
             mail.send(msg)
-            print(f">>> SUCCESS: Email sent to {msg.recipients}")
+            print(f">>> SUCCESS: Email sent successfully!")
         except Exception as e:
-            # This will show up in your Render "Logs" tab
-            print(f">>> MAIL ERROR: {type(e).__name__} - {str(e)}")
+            # This is the "Critical" log you need to look for in Render
+            print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -206,22 +207,15 @@ def checkout():
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
         # --- PREPARE EMAIL ---
-        msg = Message(subject=f"Order {order_id} Confirmed - RCAPS4STREETS", 
-                      recipients=[customer_email, MAIL_USER])
+        msg = Message(
+            subject=f"Order {order_id} Confirmed - RCAPS4STREETS", 
+            recipients=[customer_email, MAIL_USER]
+        )
         
-        msg.body = f"""
-Order Confirmation from RCAPS4STREETS
-------------------------------------
-Order ID: {order_id}
-Total Amount: ₱{total_price}
+        msg.body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you for shopping!"
 
-Shipping Details:
-{customer_address}
-{customer_city}
-
-Thank you for shopping with RCAPS4STREETS! We are processing your order now.
-"""
-
+        # Initial log before firing thread
+        print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         session.pop("cart", None)
