@@ -1,3 +1,5 @@
-flask
-flask-mail
-gunicorn
+Flask==3.0.3
+Werkzeug==3.0.3
+Flask-Mail==0.9.1
+requests==2.32.3
+gunicorn==22.0.0

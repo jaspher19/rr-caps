@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-from flask_mail import Mail, Message
+import requests  # Required for the API fix
 from werkzeug.utils import secure_filename
-import random, os, json, time, threading
+import random, os, json, time
 from datetime import datetime
 
 app = Flask(__name__)
@@ -19,9 +19,9 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# Get configuration from Render Environment Variables
+# API & Email Config
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
-MAIL_PASS = os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp')
+BREVO_API_KEY = "xsmtpsib-08c9a2e8aeb217277ffcaa007c3d69a00507276d0c7d29a9ae6437df0290f0bb-uCPikSTcOEywE8GF"
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -33,30 +33,46 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Alternative Port 587 Fix) ---
-app.config.update(
-    MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,               # Using 587 to bypass Port 465 blocks
-    MAIL_USE_TLS=True,            # TLS must be True for 587
-    MAIL_USE_SSL=False,
-    MAIL_USERNAME=MAIL_USER,
-    MAIL_PASSWORD=MAIL_PASS,
-    MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER)
-)
-# Added timeout to prevent the app from freezing on network blocks
-app.config['MAIL_TIMEOUT'] = 15
+# --- EMAIL VIA API FUNCTION ---
+def send_the_email(order_id, customer_email, total_price, address, city):
+    """Sends email via Brevo Web API to bypass Render network blocks."""
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    payload = {
+        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
+        "to": [
+            {"email": customer_email},
+            {"email": MAIL_USER} # Carbon copy to yourself
+        ],
+        "subject": f"Order Confirmation: {order_id} - RCAPS4STREETS",
+        "textContent": f"""
+Hello,
 
-mail = Mail(app)
+This is a receipt for your order at RCAPS4STREETS.
 
-def send_the_email(msg):
-    """Synchronous send to capture direct network feedback in logs."""
+Order ID: {order_id}
+Total: ₱{total_price}
+Shipping to: {address}, {city}
+
+Thank you for shopping with us!
+"""
+    }
+    
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY
+    }
+
     try:
-        print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 587...")
-        mail.send(msg)
-        print(f">>> SUCCESS: Email sent successfully!")
+        print(f">>> API ATTEMPT: Sending via Brevo for Order {order_id}...")
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 201:
+            print(">>> SUCCESS: Email sent successfully via Web API!")
+        else:
+            print(f">>> API FAILURE: {response.status_code} - {response.text}")
     except Exception as e:
-        # This will tell us if Port 587 is also blocked (Errno 101)
-        print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
+        print(f">>> API ERROR: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -208,18 +224,10 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # --- PREPARE EMAIL ---
-        msg = Message(
-            subject=f"Order Confirmation: {order_id} - RCAPS4STREETS", 
-            recipients=[customer_email, MAIL_USER]
-        )
-        
-        msg.body = f"Hello,\n\nThis is a receipt for your order at RCAPS4STREETS.\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you!"
-
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         
-        # Synchronous call
-        send_the_email(msg)
+        # Trigger the API Email
+        send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
 
         session.pop("cart", None)
         session.modified = True
