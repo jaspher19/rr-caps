@@ -23,7 +23,6 @@ ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # --- GMAIL SMTP CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
-# Your specific App Password
 GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'jmjfvzcpaxfwxmvp')
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -38,7 +37,7 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA SMTP FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Gmail SMTP (Replacing Brevo API)."""
+    """Sends email via Gmail SMTP_SSL on Port 465 to bypass Render blocks."""
     msg = MIMEMultipart()
     msg['From'] = f"RCAPS4STREETS <{MAIL_USER}>"
     msg['To'] = customer_email
@@ -58,18 +57,17 @@ Thank you for shopping with us!
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        print(f">>> SMTP ATTEMPT: Sending via Gmail for Order {order_id}...")
-        # Connecting to Gmail SMTP server
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()  # Upgrade connection to secure
+        print(f">>> SMTP ATTEMPT: Connecting via SSL (Port 465) for Order {order_id}...")
+        # Using SMTP_SSL and Port 465 is the standard for bypassing 587 blocks
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
         server.login(MAIL_USER, GMAIL_APP_PASSWORD)
         
-        # Send to customer and CC yourself
+        # Send to both customer and yourself
         recipients = [customer_email, MAIL_USER]
         server.sendmail(MAIL_USER, recipients, msg.as_string())
         
         server.quit()
-        print(">>> SUCCESS: Email sent successfully via Gmail SMTP!")
+        print(">>> SUCCESS: Receipt sent via Gmail SSL!")
     except Exception as e:
         print(f">>> SMTP FAILURE: {str(e)}")
 
@@ -225,7 +223,7 @@ def checkout():
         
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         
-        # Trigger the Direct Gmail Email
+        # Trigger the updated SMTP_SSL Email
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
 
         session.pop("cart", None)
