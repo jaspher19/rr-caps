@@ -7,7 +7,6 @@ from pymongo import MongoClient
 import certifi
 
 app = Flask(__name__)
-# Security setup - Pulls from Render Environment Variables
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
@@ -29,29 +28,19 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
-# --- EMAIL FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    if not BREVO_API_KEY:
-        print(">>> API ERROR: BREVO_API_KEY is missing!")
-        return
-
+    if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": BREVO_API_KEY
-    }
+    headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
         "subject": f"Order Confirmation: {order_id}",
-        "textContent": f"New Order Received!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nCustomer: {customer_email}\nAddress: {address}, {city}\n\nThank you!"
+        "textContent": f"New Order Received!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {address}, {city}"
     }
-    try:
-        requests.post(url, json=payload, headers=headers, timeout=15)
-    except Exception as e:
-        print(f">>> API EXCEPTION: {str(e)}")
+    try: requests.post(url, json=payload, headers=headers, timeout=15)
+    except: pass
 
 # --- SHOP ROUTES ---
 
@@ -67,18 +56,13 @@ def view_cart():
     cart_items = []
     total_price = 0
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
-    
     for pid, qty in counts.items():
-        try:
-            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
-            if p:
-                item = p.copy()
-                item['quantity'] = qty
-                cart_items.append(item)
-                total_price += p["price"] * qty
-        except:
-            continue
-            
+        p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+        if p:
+            item = p.copy()
+            item['quantity'] = qty
+            cart_items.append(item)
+            total_price += p["price"] * qty
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
@@ -99,7 +83,6 @@ def remove_from_cart():
 @app.route("/empty-cart", methods=["POST"])
 def empty_cart():
     session.pop("cart", None)
-    session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
@@ -107,58 +90,37 @@ def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
-        
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         for pid, qty in counts.items():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
-            if p:
-                total_price += p["price"] * qty
+            if p: total_price += p["price"] * qty
         
         customer_email = request.form.get("email")
-        address = request.form.get("address", "N/A")
-        city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
         orders_col.insert_one({
-            "order_id": order_id, 
-            "email": customer_email,
-            "address": address, 
-            "city": city,
-            "total": total_price, 
-            "date": datetime.now().strftime("%b %d, %Y")
+            "order_id": order_id, "email": customer_email, "total": total_price, "date": datetime.now().strftime("%b %d, %Y")
         })
-        
-        send_the_email(order_id, customer_email, total_price, address, city)
-        
+        send_the_email(order_id, customer_email, total_price, request.form.get("address"), request.form.get("city"))
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, total=total_price, email=customer_email)
-    except Exception as e:
-        print(f"Checkout Error: {e}")
-        return redirect(url_for('home'))
+    except: return redirect(url_for('home'))
 
 # --- ADMIN ROUTES ---
 
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
-    # Fetch password from Env or use default
-    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
-    if key != actual_pass: 
-        return "Unauthorized", 403
-    
-    # We fetch products AND orders to keep the admin panel fully functional
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
     all_products = list(products_col.find({}, {'_id': 0}))
-    all_orders = list(orders_col.find({}, {'_id': 0}).sort("date", -1))
-    
+    all_orders = list(orders_col.find({}, {'_id': 0}))
     return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
     key = request.args.get('key')
-    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
-    if key != actual_pass: return "Unauthorized", 403
-    
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
     file = request.files.get("photo")
     image_path = "images/products/default.jpg"
     if file:
@@ -177,12 +139,18 @@ def add_product():
     })
     return redirect(url_for('admin', key=key))
 
+@app.route("/admin/edit-price/<int:product_id>", methods=["POST"])
+def edit_price(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    new_price = request.form.get("price")
+    products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
+    return redirect(url_for('admin', key=key))
+
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
     key = request.args.get('key')
-    actual_pass = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
-    if key != actual_pass: return "Unauthorized", 403
-    
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
     products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
