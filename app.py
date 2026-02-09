@@ -19,8 +19,9 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# New Email Identity
-SHOP_EMAIL = 'ultrainstinct1596321@gmail.com' 
+# Get configuration from Render Environment Variables
+MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
+MAIL_PASS = os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp')
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -32,28 +33,27 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Final SMTP Fix) ---
+# --- EMAIL CONFIG (Strictly using Environment Variables) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
     MAIL_USE_SSL=False,
-    MAIL_USERNAME=SHOP_EMAIL,
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp'),
-    MAIL_DEFAULT_SENDER=SHOP_EMAIL,
-    MAIL_MAX_EMAILS=None,
-    MAIL_ASCII_ATTACHMENTS=False
+    MAIL_USERNAME=MAIL_USER,
+    MAIL_PASSWORD=MAIL_PASS,
+    MAIL_DEFAULT_SENDER=( "RCAPS4STREETS", MAIL_USER) # Added Display Name
 )
 mail = Mail(app)
 
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            print(f">>> ATTEMPTING SMTP LOGIN AS: {SHOP_EMAIL}")
+            print(f">>> SMTP ATTEMPT: Using {MAIL_USER}")
             mail.send(msg)
-            print(f">>> SUCCESS: Receipt sent to {msg.recipients}")
+            print(f">>> SUCCESS: Email sent to {msg.recipients}")
         except Exception as e:
-            print(f">>> CRITICAL MAIL ERROR: {str(e)}")
+            # This will show up in your Render "Logs" tab
+            print(f">>> MAIL ERROR: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -191,7 +191,6 @@ def checkout():
         customer_address = request.form.get("address", "N/A")
         customer_city = request.form.get("city", "N/A")
 
-        # --- UPDATED ORDER ID FORMAT (RCAPS-2026-XXXX) ---
         current_year = datetime.now().year
         order_id = f"RCAPS-{current_year}-{random.randint(1000, 9999)}"
         
@@ -206,9 +205,9 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # --- PREPARE EMAIL WITH BRANDED TEXT ---
+        # --- PREPARE EMAIL ---
         msg = Message(subject=f"Order {order_id} Confirmed - RCAPS4STREETS", 
-                      recipients=[customer_email, SHOP_EMAIL])
+                      recipients=[customer_email, MAIL_USER])
         
         msg.body = f"""
 Order Confirmation from RCAPS4STREETS
@@ -223,7 +222,6 @@ Shipping Details:
 Thank you for shopping with RCAPS4STREETS! We are processing your order now.
 """
 
-        # Run in thread so the user doesn't wait
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         session.pop("cart", None)
