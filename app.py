@@ -19,7 +19,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# Updated to your new email
+# New Email Identity
 SHOP_EMAIL = 'ultrainstinct1596321@gmail.com' 
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -32,14 +32,14 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Optimized for Gmail) ---
+# --- EMAIL CONFIG (Final SMTP Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
     MAIL_USE_SSL=False,
     MAIL_USERNAME=SHOP_EMAIL,
-    # Fallback uses your NEW App Password
+    # The password must have NO spaces
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL,
     MAIL_MAX_EMAILS=None,
@@ -50,11 +50,12 @@ mail = Mail(app)
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            print(f">>> STARTING EMAIL SEND TO: {msg.recipients}")
+            print(f">>> ATTEMPTING SMTP LOGIN AS: {SHOP_EMAIL}")
             mail.send(msg)
             print(f">>> SUCCESS: Receipt sent to {msg.recipients}")
         except Exception as e:
-            print(f">>> EMAIL ERROR: {str(e)}")
+            # Check Render Logs for this output if it still fails
+            print(f">>> CRITICAL MAIL ERROR: {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -87,6 +88,7 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
     file = request.files.get("photo")
     image_path = "images/products/default.jpg"
     if file:
@@ -207,19 +209,9 @@ def checkout():
         msg = Message(subject=f"Order {order_id} Confirmed - R-CAPS", 
                       recipients=[customer_email, SHOP_EMAIL])
         
-        msg.body = f"""
-Order Confirmation
-------------------
-Order ID: {order_id}
-Total Amount: ₱{total_price}
+        msg.body = f"Order Confirmation\n------------------\nOrder ID: {order_id}\nTotal: ₱{total_price}\nShipping: {customer_address}, {customer_city}\n\nThank you for shopping!"
 
-Shipping Details:
-{customer_address}
-{customer_city}
-
-Thank you for shopping with R-CAPS!
-"""
-        # Run in thread so the user doesn't wait
+        # Use threading to prevent the page from hanging while sending
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         session.pop("cart", None)
