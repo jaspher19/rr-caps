@@ -20,8 +20,7 @@ ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 # --- EMAIL CONFIG ---
 SENDER_EMAIL = "ultrainstinct1596321@gmail.com"
 
-# FIXED: Removed the hardcoded key to pass GitHub Push Protection.
-# You will set this value in the Render Dashboard Environment Variables.
+# SUCCESS: Key is pulled from Render Environment Variables safely
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -74,7 +73,9 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     except Exception as e:
         print(f">>> API EXCEPTION: {str(e)}")
 
-# --- UTILS ---
+# --- UTILS, SHOP ROUTES, AND ADMIN ROUTES REMAIN UNCHANGED ---
+# (Rest of the code as provided in your snippet)
+
 def load_products():
     try:
         with open(PRODUCT_FILE, 'r') as f: return json.load(f)
@@ -87,8 +88,6 @@ def load_orders():
     try:
         with open(ORDER_FILE, 'r') as f: return json.load(f)
     except: return []
-
-# --- SHOP ROUTES ---
 
 @app.route("/")
 @app.route("/shop")
@@ -162,7 +161,6 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        # Trigger the API call
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
@@ -170,8 +168,6 @@ def checkout():
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
-
-# --- ADMIN ROUTES ---
 
 @app.route("/admin")
 def admin():
