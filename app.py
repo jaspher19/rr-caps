@@ -7,7 +7,7 @@ from pymongo import MongoClient
 import certifi
 
 app = Flask(__name__)
-# Pulls from Render Environment Variables
+# Security setup - Pulls from Render Environment Variables
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
@@ -26,11 +26,10 @@ if not os.path.exists(UPLOAD_FOLDER):
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # --- EMAIL CONFIG ---
-# Set MAIL_USERNAME in Render to your email (e.g., ultrainstinct1596321@gmail.com)
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
-# --- EMAIL FUNCTION (Sends to Customer + BCC to Owner) ---
+# --- EMAIL FUNCTION (Customer Receipt + Owner BCC) ---
 def send_the_email(order_id, customer_email, total_price, address, city):
     if not BREVO_API_KEY:
         print(">>> API ERROR: BREVO_API_KEY is missing!")
@@ -42,17 +41,15 @@ def send_the_email(order_id, customer_email, total_price, address, city):
         "content-type": "application/json",
         "api-key": BREVO_API_KEY
     }
-    
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
-        "bcc": [{"email": MAIL_USER}], # This sends a copy to YOU
+        "bcc": [{"email": MAIL_USER}], # Copy sent to you
         "subject": f"Order Confirmation: {order_id}",
-        "textContent": f"New Order Received!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nCustomer: {customer_email}\nAddress: {address}, {city}\n\nThank you for shopping with RCAPS!"
+        "textContent": f"New Order Received!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nCustomer: {customer_email}\nAddress: {address}, {city}\n\nThank you!"
     }
     try:
-        r = requests.post(url, json=payload, headers=headers, timeout=15)
-        print(f">>> BREVO STATUS: {r.status_code}")
+        requests.post(url, json=payload, headers=headers, timeout=15)
     except Exception as e:
         print(f">>> API EXCEPTION: {str(e)}")
 
@@ -61,7 +58,6 @@ def send_the_email(order_id, customer_email, total_price, address, city):
 @app.route("/")
 @app.route("/shop")
 def home():
-    # Recalls products from MongoDB
     all_products = list(products_col.find({}, {'_id': 0}))
     return render_template("index.html", products=all_products, cart_count=len(session.get("cart", [])))
 
@@ -70,7 +66,9 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
+    # Group products by ID for the cart view
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+    
     for pid, qty in counts.items():
         p = products_col.find_one({"id": int(pid)}, {'_id': 0})
         if p:
@@ -78,6 +76,7 @@ def view_cart():
             item['quantity'] = qty
             cart_items.append(item)
             total_price += p["price"] * qty
+            
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
@@ -87,6 +86,19 @@ def add_to_cart():
     session.modified = True
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
 
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    product_id = request.form.get("product_id")
+    if "cart" in session and str(product_id) in session["cart"]:
+        session["cart"].remove(str(product_id))
+        session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    return redirect(url_for('view_cart'))
+
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
@@ -94,20 +106,18 @@ def checkout():
         if not cart_ids: return redirect(url_for("home"))
         
         total_price = 0
-        items_for_receipt = []
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         for pid, qty in counts.items():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                items_for_receipt.append(p)
-
+        
         customer_email = request.form.get("email")
         address = request.form.get("address", "N/A")
         city = request.form.get("city", "N/A")
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
-        # 1. Save to MongoDB (Persistent)
+        # Save order to MongoDB
         orders_col.insert_one({
             "order_id": order_id, 
             "email": customer_email,
@@ -117,7 +127,7 @@ def checkout():
             "date": datetime.now().strftime("%b %d, %Y")
         })
         
-        # 2. Trigger Email (BCC included)
+        # Send Email Receipt (and BCC you)
         send_the_email(order_id, customer_email, total_price, address, city)
         
         session.pop("cart", None)
@@ -155,15 +165,6 @@ def add_product():
         "badge": request.form.get("badge"),
         "category": request.form.get("category")
     })
-    return redirect(url_for('admin', key=key))
-
-@app.route("/admin/edit_price/<int:product_id>", methods=["POST"])
-def edit_price(product_id):
-    key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    new_price = request.form.get("new_price")
-    if new_price:
-        products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
     return redirect(url_for('admin', key=key))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
