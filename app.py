@@ -33,15 +33,15 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG ---
+# --- EMAIL CONFIG (Port 465 SSL Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,
-    MAIL_USE_TLS=True,
-    MAIL_USE_SSL=False,
+    MAIL_PORT=465,             # Changed from 587
+    MAIL_USE_TLS=False,        # Changed from True
+    MAIL_USE_SSL=True,         # Changed from False
     MAIL_USERNAME=MAIL_USER,
     MAIL_PASSWORD=MAIL_PASS,
-    MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER) 
+    MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER)
 )
 mail = Mail(app)
 
