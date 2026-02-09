@@ -45,15 +45,14 @@ app.config.update(
 )
 mail = Mail(app)
 
-def send_async_email(app, msg):
-    with app.app_context():
-        try:
-            print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 465...")
-            mail.send(msg)
-            print(f">>> SUCCESS: Email sent successfully!")
-        except Exception as e:
-            # This captures the exact reason (Network, Auth, or Timeout)
-            print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
+def send_the_email(msg):
+    """Removed background threading to ensure the email sends before the page loads."""
+    try:
+        print(f">>> SMTP ATTEMPT: Sending to {msg.recipients} via Port 465...")
+        mail.send(msg)
+        print(f">>> SUCCESS: Email sent successfully!")
+    except Exception as e:
+        print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
 def load_products():
@@ -211,20 +210,12 @@ def checkout():
             recipients=[customer_email, MAIL_USER]
         )
         
-        msg.body = f"""
-Hello,
-
-This is a receipt for your order at RCAPS4STREETS.
-
-Order ID: {order_id}
-Total: ₱{total_price}
-Shipping to: {customer_address}, {customer_city}
-
-We are processing your order now. Thank you!
-"""
+        msg.body = f"Hello,\n\nThis is a receipt for your order at RCAPS4STREETS.\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you!"
 
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
-        threading.Thread(target=send_async_email, args=(app, msg)).start()
+        
+        # FIX: Call directly instead of using a Thread
+        send_the_email(msg)
 
         session.pop("cart", None)
         session.modified = True
