@@ -33,12 +33,12 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG (Port 465 SSL Fix) ---
+# --- EMAIL CONFIG (Final Port 465 SSL Fix) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=465,             # Changed from 587
-    MAIL_USE_TLS=False,        # Changed from True
-    MAIL_USE_SSL=True,         # Changed from False
+    MAIL_PORT=465,               # Use 465 for SSL
+    MAIL_USE_TLS=False,          # TLS must be False when using Port 465
+    MAIL_USE_SSL=True,           # SSL must be True
     MAIL_USERNAME=MAIL_USER,
     MAIL_PASSWORD=MAIL_PASS,
     MAIL_DEFAULT_SENDER=("RCAPS4STREETS", MAIL_USER)
@@ -48,12 +48,11 @@ mail = Mail(app)
 def send_async_email(app, msg):
     with app.app_context():
         try:
-            # We print this inside the thread to confirm it started
             print(f">>> THREAD START: Sending email to {msg.recipients}")
             mail.send(msg)
-            print(f">>> SUCCESS: Email sent successfully!")
+            print(f">>> SUCCESS: Email sent successfully via Port 465!")
         except Exception as e:
-            # This is the "Critical" log you need to look for in Render
+            # Capture the exact error if SSL fails
             print(f">>> SMTP FAILURE: {type(e).__name__} - {str(e)}")
 
 # --- UTILS ---
@@ -212,9 +211,8 @@ def checkout():
             recipients=[customer_email, MAIL_USER]
         )
         
-        msg.body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you for shopping!"
+        msg.body = f"Order ID: {order_id}\nTotal: ₱{total_price}\nShipping to: {customer_address}, {customer_city}\n\nThank you for shopping at RCAPS4STREETS!"
 
-        # Initial log before firing thread
         print(f">>> INITIATING CHECKOUT FOR: {customer_email}")
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
