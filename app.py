@@ -18,7 +18,9 @@ else:
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
 PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
-SHOP_EMAIL = 'jasphertampos5@gmail.com' 
+
+# Updated to your new email
+SHOP_EMAIL = 'ultrainstinct1596321@gmail.com' 
 
 if not os.path.exists(UPLOAD_FOLDER): 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -35,9 +37,10 @@ app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
-    MAIL_USE_SSL=False, # Gmail uses TLS on 587, not SSL
+    MAIL_USE_SSL=False,
     MAIL_USERNAME=SHOP_EMAIL,
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'zwnddgfzxymmtkct'),
+    # Fallback uses your NEW App Password
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'jmjfvzcpaxfwxmvp'),
     MAIL_DEFAULT_SENDER=SHOP_EMAIL,
     MAIL_MAX_EMAILS=None,
     MAIL_ASCII_ATTACHMENTS=False
@@ -51,7 +54,6 @@ def send_async_email(app, msg):
             mail.send(msg)
             print(f">>> SUCCESS: Receipt sent to {msg.recipients}")
         except Exception as e:
-            # This will show up in your Render "Logs" tab
             print(f">>> EMAIL ERROR: {str(e)}")
 
 # --- UTILS ---
