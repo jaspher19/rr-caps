@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
-import requests  # Use requests instead of smtplib for Render compatibility
+import requests  # Replaces smtplib for better reliability on Render
 from werkzeug.utils import secure_filename
 import random, os, json, time
 from datetime import datetime
@@ -18,9 +18,7 @@ PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
 ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 
 # --- EMAIL CONFIG ---
-SENDER_EMAIL = "ultrainstinct1596321@gmail.com"
-
-# SUCCESS: Key is pulled from Render Environment Variables safely
+MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -35,9 +33,9 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
 
 # --- EMAIL VIA BREVO API FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city):
-    """Sends email via Brevo API. This bypasses the SMTP port block on Render."""
+    """Sends email via Brevo API. Bypasses SMTP timeout issues on Render."""
     if not BREVO_API_KEY:
-        print(">>> API ERROR: BREVO_API_KEY is missing from environment variables!")
+        print(">>> API ERROR: BREVO_API_KEY is missing!")
         return
 
     url = "https://api.brevo.com/v3/smtp/email"
@@ -49,7 +47,7 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     }
 
     payload = {
-        "sender": {"name": "RCAPS4STREETS", "email": SENDER_EMAIL},
+        "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "subject": f"Order Confirmation: {order_id}",
         "textContent": (
@@ -57,13 +55,13 @@ def send_the_email(order_id, customer_email, total_price, address, city):
             f"Order ID: {order_id}\n"
             f"Total: ₱{total_price}\n"
             f"Address: {address}, {city}\n\n"
-            f"Thank you for shopping with RCAPS4STREETS!"
+            f"Thank you for shopping with us!"
         ),
-        "bcc": [{"email": SENDER_EMAIL}] # Admin copy
+        "bcc": [{"email": MAIL_USER}]  # Admin receives a copy automatically
     }
 
     try:
-        print(f">>> API ATTEMPT: Sending via Port 443 (HTTP)...")
+        print(f">>> API ATTEMPT: Sending request to Brevo for Order {order_id}...")
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         
         if response.status_code in [200, 201, 202]:
@@ -73,9 +71,7 @@ def send_the_email(order_id, customer_email, total_price, address, city):
     except Exception as e:
         print(f">>> API EXCEPTION: {str(e)}")
 
-# --- UTILS, SHOP ROUTES, AND ADMIN ROUTES REMAIN UNCHANGED ---
-# (Rest of the code as provided in your snippet)
-
+# --- UTILS ---
 def load_products():
     try:
         with open(PRODUCT_FILE, 'r') as f: return json.load(f)
@@ -88,6 +84,8 @@ def load_orders():
     try:
         with open(ORDER_FILE, 'r') as f: return json.load(f)
     except: return []
+
+# --- SHOP ROUTES ---
 
 @app.route("/")
 @app.route("/shop")
@@ -161,6 +159,7 @@ def checkout():
         })
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
+        # Trigger API call
         send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
         
         session.pop("cart", None)
@@ -168,6 +167,8 @@ def checkout():
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
+
+# --- ADMIN ROUTES ---
 
 @app.route("/admin")
 def admin():
