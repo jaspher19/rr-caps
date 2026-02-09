@@ -8,11 +8,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_ultra_secret_key")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
-# Absolute paths for Render stability
+# --- PERSISTENT STORAGE CONFIG ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+if os.path.exists('/data'):
+    DATA_DIR = '/data'
+else:
+    DATA_DIR = BASE_DIR
+
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static/images/products')
-PRODUCT_FILE = os.path.join(BASE_DIR, 'products.json')
-ORDER_FILE = os.path.join(BASE_DIR, 'orders.json')
+PRODUCT_FILE = os.path.join(DATA_DIR, 'products.json')
+ORDER_FILE = os.path.join(DATA_DIR, 'orders.json')
 SHOP_EMAIL = 'jasphertampos5@gmail.com' 
 
 if not os.path.exists(UPLOAD_FOLDER): 
@@ -25,27 +30,31 @@ for file_path in [PRODUCT_FILE, ORDER_FILE]:
         with open(file_path, 'w') as f:
             json.dump([], f)
 
-# --- EMAIL CONFIG ---
+# --- EMAIL CONFIG (Optimized for Gmail) ---
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
-    MAIL_USE_SSL=False,
+    MAIL_USE_SSL=False, # Gmail uses TLS on 587, not SSL
     MAIL_USERNAME=SHOP_EMAIL,
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'bsjbptoaxqzjoern'),
-    MAIL_DEFAULT_SENDER=SHOP_EMAIL
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD', 'zwnddgfzxymmtkct'),
+    MAIL_DEFAULT_SENDER=SHOP_EMAIL,
+    MAIL_MAX_EMAILS=None,
+    MAIL_ASCII_ATTACHMENTS=False
 )
 mail = Mail(app)
 
 def send_async_email(app, msg):
     with app.app_context():
         try:
+            print(f">>> STARTING EMAIL SEND TO: {msg.recipients}")
             mail.send(msg)
-            print(">>> EMAIL SENT SUCCESSFULLY")
+            print(f">>> SUCCESS: Receipt sent to {msg.recipients}")
         except Exception as e:
-            print(f">>> Background Mail Error: {e}")
+            # This will show up in your Render "Logs" tab
+            print(f">>> EMAIL ERROR: {str(e)}")
 
-# --- REPAIRED UTILS ---
+# --- UTILS ---
 def load_products():
     try:
         with open(PRODUCT_FILE, 'r') as f: return json.load(f)
@@ -69,15 +78,13 @@ def home():
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
-    if key != ADMIN_PASSWORD:
-        return "Unauthorized", 403
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
     return render_template("admin.html", products=load_products(), admin_key=key)
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    
     file = request.files.get("photo")
     image_path = "images/products/default.jpg"
     if file:
@@ -119,16 +126,14 @@ def order_history():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     return render_template("orders.html", orders=load_orders(), admin_key=key)
 
-# --- CART MANAGEMENT ---
+# --- CART ---
 
 @app.route("/cart")
 def view_cart():
     products = load_products()
     cart_ids = session.get("cart", [])
-    
     cart_items = []
     total_price = 0
-    # Counts instances of each product ID
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
@@ -138,7 +143,6 @@ def view_cart():
                 item['quantity'] = qty
                 cart_items.append(item)
                 total_price += p["price"] * qty
-                
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
@@ -151,10 +155,9 @@ def add_to_cart():
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
     product_id = request.form.get("product_id")
-    if "cart" in session:
-        if str(product_id) in session["cart"]:
-            session["cart"].remove(str(product_id))
-            session.modified = True
+    if "cart" in session and str(product_id) in session["cart"]:
+        session["cart"].remove(str(product_id))
+        session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/empty-cart", methods=["POST"])
@@ -173,7 +176,6 @@ def checkout():
         products = load_products()
         checkout_items = []
         total_price = 0
-        
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         for pid, qty in counts.items():
             for p in products:
@@ -197,13 +199,25 @@ def checkout():
             "total": total_price,
             "date": datetime.now().strftime("%b %d, %Y")
         })
-        save_products = [] # This line in original was wrong, we use with open:
         with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
         
-        msg = Message(subject=f"Order {order_id} Confirmed", 
-                      sender=SHOP_EMAIL, 
+        # --- PREPARE EMAIL ---
+        msg = Message(subject=f"Order {order_id} Confirmed - R-CAPS", 
                       recipients=[customer_email, SHOP_EMAIL])
-        msg.body = f"Thank you for your order!\n\nOrder ID: {order_id}\nTotal: ₱{total_price}\nAddress: {customer_address}, {customer_city}"
+        
+        msg.body = f"""
+Order Confirmation
+------------------
+Order ID: {order_id}
+Total Amount: ₱{total_price}
+
+Shipping Details:
+{customer_address}
+{customer_city}
+
+Thank you for shopping with R-CAPS!
+"""
+        # Run in thread so the user doesn't wait
         threading.Thread(target=send_async_email, args=(app, msg)).start()
 
         session.pop("cart", None)
