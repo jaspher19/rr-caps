@@ -78,12 +78,14 @@ def view_cart():
     total_price = 0
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     for pid, qty in counts.items():
-        p = products_col.find_one({"id": int(pid)}, {'_id': 0})
-        if p:
-            item = p.copy()
-            item['quantity'] = qty
-            cart_items.append(item)
-            total_price += p["price"] * qty
+        try:
+            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+            if p:
+                item = p.copy()
+                item['quantity'] = qty
+                cart_items.append(item)
+                total_price += p["price"] * qty
+        except: continue
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/add-to-cart", methods=["POST"])
@@ -112,7 +114,6 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
-        # 1. Gather product details for the receipt
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
@@ -127,7 +128,7 @@ def checkout():
                     "qty": qty
                 })
         
-        # 2. Get new form fields
+        # Pulling the new Phone and Description fields
         customer_email = request.form.get("email")
         phone = request.form.get("phone", "N/A")
         address = request.form.get("address", "N/A")
@@ -136,7 +137,6 @@ def checkout():
         
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
-        # 3. Save detailed order to MongoDB
         orders_col.insert_one({
             "order_id": order_id, 
             "email": customer_email,
@@ -149,7 +149,6 @@ def checkout():
             "date": datetime.now().strftime("%b %d, %Y")
         })
         
-        # 4. Send detailed email
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
         
         session.pop("cart", None)
@@ -165,7 +164,7 @@ def admin():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     all_products = list(products_col.find({}, {'_id': 0}))
-    all_orders = list(orders_col.find({}, {'_id': 0}))
+    all_orders = list(orders_col.find({}, {'_id': 0}).sort("date", -1))
     return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
 
 @app.route("/admin/add", methods=["POST"])
