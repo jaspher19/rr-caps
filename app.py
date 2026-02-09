@@ -128,4 +128,79 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
         
-        products = load_
+        products = load_products() # Fixed here
+        checkout_items = []
+        total_price = 0
+        counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+        for pid, qty in counts.items():
+            for p in products:
+                if str(p["id"]) == pid:
+                    item = p.copy()
+                    item['quantity'] = qty
+                    checkout_items.append(item)
+                    total_price += p["price"] * qty
+        
+        customer_email = request.form.get("email")
+        customer_address = request.form.get("address", "N/A")
+        customer_city = request.form.get("city", "N/A")
+        order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
+        
+        orders = load_orders()
+        orders.append({
+            "order_id": order_id, "email": customer_email,
+            "address": customer_address, "city": customer_city,
+            "total": total_price, "date": datetime.now().strftime("%b %d, %Y")
+        })
+        with open(ORDER_FILE, 'w') as f: json.dump(orders, f, indent=4)
+        
+        send_the_email(order_id, customer_email, total_price, customer_address, customer_city)
+        
+        session.pop("cart", None)
+        return render_template("success.html", order_id=order_id, items=checkout_items, total=total_price, email=customer_email, address=customer_address, city=customer_city)
+    except Exception as e:
+        print(f"Checkout Error: {e}")
+        return redirect(url_for('home'))
+
+# --- ADMIN ROUTES ---
+
+@app.route("/admin")
+def admin():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    return render_template("admin.html", products=load_products(), admin_key=key)
+
+@app.route("/admin/add", methods=["POST"])
+def add_product():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
+    file = request.files.get("photo")
+    image_path = "images/products/default.jpg"
+    if file:
+        filename = secure_filename(file.filename)
+        unique_name = f"{int(time.time())}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+        image_path = f"images/products/{unique_name}"
+    
+    products = load_products()
+    products.append({
+        "id": int(time.time()), 
+        "name": request.form.get("name"),
+        "price": int(request.form.get("price", 0)),
+        "image": image_path,
+        "badge": request.form.get("badge"),
+        "category": request.form.get("category")
+    })
+    save_products(products)
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/delete/<int:product_id>", methods=["POST"])
+def delete_product(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    products = [p for p in load_products() if p['id'] != product_id]
+    save_products(products)
+    return redirect(url_for('admin', key=key))
+
+if __name__ == "__main__":
+    app.run(debug=True)
