@@ -36,7 +36,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     
-    # Updated to include product name, qty, price, and a direct link to the image for the customer
     items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}\n  Image: {item['image']}" for item in items_list])
     
     email_body = (
@@ -72,6 +71,32 @@ def home():
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
 
+# --- NEW: ADD TO CART ROUTE (FIXES YOUR 404) ---
+@app.route("/add-to-cart", methods=["POST"])
+def add_to_cart():
+    try:
+        pid = request.form.get("id")
+        if not pid:
+            return jsonify({"status": "error", "message": "Missing ID"}), 400
+
+        # Create/Get session cart
+        cart = session.get("cart", [])
+        
+        # Verify product exists in DB before adding
+        # We check both int and str versions of the ID for safety
+        p = products_col.find_one({"id": int(pid)}) or products_col.find_one({"id": str(pid)})
+        
+        if p:
+            cart.append(str(pid)) # We store the ID as a string in the session
+            session["cart"] = cart
+            session.modified = True
+            return jsonify({"status": "success", "cart_count": len(cart)})
+        
+        return jsonify({"status": "error", "message": "Product not found in database"}), 404
+    except Exception as e:
+        print(f"Cart Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route("/cart")
 def view_cart():
     cart_ids = session.get("cart", [])
@@ -80,10 +105,11 @@ def view_cart():
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     for pid, qty in counts.items():
         try:
-            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+            # Check both int and str to find product
+            p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
-                item['qty'] = qty # Syncing variable names to 'qty'
+                item['qty'] = qty
                 cart_items.append(item)
                 total_price += p["price"] * qty
         except: continue
@@ -100,10 +126,9 @@ def checkout():
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         
         for pid, qty in counts.items():
-            p = products_col.find_one({"id": int(pid)}, {'_id': 0})
+            p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                # FIX: Adding 'image' to the list so success.html and email can see it
                 items_for_receipt.append({
                     "name": p["name"], 
                     "price": p["price"], 
@@ -128,7 +153,6 @@ def checkout():
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
         
         session.pop("cart", None)
-        # FIX: Passing address, city, and items to the success page
         return render_template("success.html", 
                                order_id=order_id, 
                                total=total_price, 
