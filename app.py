@@ -33,7 +33,7 @@ BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
     if not BREVO_API_KEY: 
-        print("EMAIL ERROR: BREVO_API_KEY is missing from Render environment.")
+        print("EMAIL ERROR: No BREVO_API_KEY found in Environment Variables.")
         return
     
     url = "https://api.brevo.com/v3/smtp/email"
@@ -44,20 +44,21 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     email_body = (
         f"Order Confirmation: {order_id}\n"
         f"-----------------------------------\n"
-        f"Customer: {customer_email}\n"
-        f"Address: {address}, {city}\n"
-        f"Phone: {phone}\n\n"
-        f"Items Ordered:\n{items_text}\n"
+        f"CUSTOMER DETAILS:\n"
+        f"Email: {customer_email}\n"
+        f"Phone: {phone}\n"
+        f"Address: {address}, {city}\n\n"
+        f"ITEMS ORDERED:\n"
+        f"{items_text}\n"
         f"-----------------------------------\n"
-        f"TOTAL: ₱{total_price}\n\n"
+        f"GRAND TOTAL: ₱{total_price}\n\n"
         f"Thank you for shopping with RCAPS4STREETS!"
     )
-    
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
-        "subject": f"New Order - {order_id}",
+        "subject": f"Receipt for Order {order_id}",
         "textContent": email_body
     }
     try: 
@@ -79,7 +80,8 @@ def home():
 def add_to_cart():
     try:
         pid = request.form.get("id")
-        if not pid: return jsonify({"status": "error"}), 400
+        if not pid:
+            return jsonify({"status": "error", "message": "Missing ID"}), 400
         cart = session.get("cart", [])
         cart.append(str(pid))
         session["cart"] = cart
@@ -93,35 +95,44 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
+    # Grouping and counting items in the bag
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
         try:
+            # Look up product by Int or String ID
             p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
-                img = item.get('image', '')
+                img_path = item.get('image', '')
+
+                # --- ADVANCED PHOTO FIX ---
+                # 1. If it's a full URL (Cloudinary), leave it alone
+                if img_path.startswith('http'):
+                    pass
+                # 2. If it starts with 'images/', it's missing the 'static/' prefix
+                elif img_path.startswith('images/'):
+                    item['image'] = '/static/' + img_path
+                # 3. If it's relative but missing the leading slash
+                elif not img_path.startswith('/'):
+                    item['image'] = '/' + img_path
                 
-                # IMAGE FIX: Ensure local paths are correctly mapped to /static/images/
-                if img and not img.startswith('http'):
-                    if not img.startswith('/'): img = '/' + img
-                    if '/static/' not in img:
-                        img = img.replace('/images/', '/static/images/')
-                
-                item['image'] = img
                 item['qty'] = qty
                 item['quantity'] = qty 
                 cart_items.append(item)
                 total_price += p["price"] * qty
-        except: continue
+        except Exception as e: 
+            print(f"Cart Item Error: {e}")
+            continue
+            
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
-    pid = request.form.get("id")
+    pid = str(request.form.get("id"))
     cart = session.get("cart", [])
-    if str(pid) in cart:
-        cart.remove(str(pid))
+    if pid in cart:
+        cart.remove(pid) 
         session["cart"] = cart
         session.modified = True
     return redirect(url_for('view_cart'))
@@ -129,6 +140,7 @@ def remove_from_cart():
 @app.route("/empty-cart", methods=["POST"])
 def empty_cart():
     session.pop("cart", None)
+    session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
@@ -146,15 +158,20 @@ def checkout():
             if p:
                 total_price += p["price"] * qty
                 items_for_receipt.append({
-                    "name": p["name"], "price": p["price"], 
-                    "qty": qty, "image": p.get("image", "")
+                    "name": p["name"], 
+                    "price": p["price"], 
+                    "qty": qty,
+                    "image": p.get("image", "")
                 })
         
         customer_email = request.form.get("email")
-        order_id = f"RCAPS-{random.randint(1000, 9999)}"
+        order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
         orders_col.insert_one({
             "order_id": order_id, "email": customer_email, 
+            "phone": request.form.get("phone", "N/A"),
+            "address": request.form.get("address", "N/A"), 
+            "city": request.form.get("city", "N/A"),
             "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
@@ -183,11 +200,13 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
     file = request.files.get("photo")
     image_url = "https://via.placeholder.com/500" 
+    
     if file:
-        res = cloudinary.uploader.upload(file)
-        image_url = res['secure_url']
+        upload_result = cloudinary.uploader.upload(file)
+        image_url = upload_result['secure_url']
     
     products_col.insert_one({
         "id": int(time.time()), 
@@ -197,7 +216,7 @@ def add_product():
         "badge": request.form.get("badge"),
         "category": request.form.get("category")
     })
-    return redirect(url_for('admin', key=key))
+    return redirect(url_for('admin', key=key, success=True))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
@@ -207,4 +226,5 @@ def delete_product(product_id):
     return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
