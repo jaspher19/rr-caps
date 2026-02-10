@@ -102,7 +102,9 @@ def view_cart():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
+                # FIX: We provide both 'qty' and 'quantity' to avoid Jinja UndefinedErrors
                 item['qty'] = qty
+                item['quantity'] = qty 
                 cart_items.append(item)
                 total_price += p["price"] * qty
         except: continue
