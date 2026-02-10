@@ -47,7 +47,7 @@ def get_clean_image_url(img_path):
     
     return "/" + urllib.parse.quote(final_path)
 
-def send_the_email(order_id, customer_email, total_price, address, phone, items_list):
+def send_the_email(order_id, customer_email, total_price, address, phone, items_list, payment_method):
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
@@ -72,6 +72,7 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
         <body style='background:#000; color:#fff; font-family: sans-serif; padding: 20px;'>
             <h2 style="color: #00ff00;">ORDER CONFIRMED</h2>
             <p>Reference: {order_id}</p>
+            <p><strong>Payment Method:</strong> {payment_method}</p>
             <hr style="border: 1px solid #333;">
             <table width="100%" style="color: #eee;">
                 {items_html}
@@ -128,7 +129,6 @@ def view_cart():
         p = products_col.find_one(query, {'_id': 0})
         if p:
             item = p.copy()
-            # UPDATED: Using exact standardization logic as shop home page
             item['image'] = get_clean_image_url(item.get('image'))
             item['quantity'] = qty
             cart_items.append(item)
@@ -160,18 +160,22 @@ def checkout():
         full_address = f"{request.form.get('address')}, {request.form.get('city')}"
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
         
+        # New: Get payment method from form
+        payment_choice = request.form.get("payment_method", "Cash on Delivery")
+        
         order_data = {
             "order_id": order_id, 
             "email": request.form.get("email"),
             "phone": request.form.get("phone"),
             "address": full_address,
             "total": total_price, 
+            "payment_method": payment_choice,
             "date": datetime.now().strftime("%b %d, %Y"), 
             "items": items_for_receipt
         }
         
         orders_col.insert_one(order_data)
-        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt)
+        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice)
         
         session.pop("cart", None)
         session.modified = True

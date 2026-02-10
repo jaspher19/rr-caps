@@ -23,7 +23,7 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
     /* Clean mobile inputs */
-    input, textarea { -webkit-appearance: none; border-radius: 0; }
+    input, textarea, select { -webkit-appearance: none; border-radius: 0; }
   </style>
 </head>
 
@@ -34,7 +34,7 @@
       <div class="relative w-8 h-8 md:w-10 md:h-10 overflow-hidden rounded-lg border border-white/10">
         <img src="{{ url_for('static', filename='images/LOGOS/LOGO.jfif') }}" alt="Logo" class="w-full h-full object-cover">
       </div>
-      <span class="text-lg md:text-xl font-extrabold tracking-tighter uppercase">RCAPS4</span>
+      <span class="text-lg md:text-xl font-extrabold tracking-tighter uppercase">RCAPS4STREET</span>
     </a>
     <a href="{{ url_for('home') }}" class="text-[9px] md:text-[10px] uppercase tracking-[0.2em] hover:text-gray-400 transition">Continue <span class="hidden md:inline">Shopping</span></a>
   </nav>
@@ -43,7 +43,7 @@
     <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-12 border-b border-white/10 pb-6 gap-6">
       <div>
         <h1 class="text-3xl md:text-4xl font-extrabold tracking-tighter uppercase">Your Bag</h1>
-        <p class="text-gray-500 text-sm">({{ cart|length if cart else 0 }} Unique Items)</p>
+        <h2 class="text-gray-500 text-xs mt-1 uppercase tracking-widest">({{ cart|length if cart else 0 }} Unique Items)</h2>
       </div>
       
       {% if cart %}
@@ -61,7 +61,7 @@
         <div class="flex items-center justify-between group">
           <div class="flex items-center gap-4 md:gap-6">
             <div class="w-16 h-20 md:w-20 md:h-24 bg-[#111] flex items-center justify-center overflow-hidden rounded relative border border-white/5 flex-shrink-0">
-              <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.name }}" class="w-4/5 object-contain">
+              <img src="{{ item.image }}" alt="{{ item.name }}" class="w-full h-full object-cover">
               
               {% if item.quantity > 1 %}
               <div class="absolute top-1 right-1 bg-white text-black text-[7px] md:text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg">
@@ -77,7 +77,7 @@
                 <span class="text-[9px] md:text-[10px] text-gray-500 uppercase font-semibold">Qty: {{ item.quantity }}</span>
                 
                 <form action="{{ url_for('remove_from_cart') }}" method="POST">
-                  <input type="hidden" name="product_id" value="{{ item.id }}">
+                  <input type="hidden" name="id" value="{{ item.id }}">
                   <button type="submit" class="text-[8px] md:text-[9px] text-red-500/60 hover:text-red-500 uppercase tracking-widest transition text-left">
                     Remove One
                   </button>
@@ -114,6 +114,15 @@
                        class="bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition">
             </div>
 
+            <div class="pt-4">
+                <label class="text-[9px] text-gray-500 tracking-widest uppercase mb-2 block font-bold">Payment Method</label>
+                <select name="payment_method" required
+                        class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition cursor-pointer text-white">
+                    <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+                    <option value="GCash / Instant Pay">GCash / Instant Pay</option>
+                </select>
+            </div>
+
             <textarea name="description" rows="3" placeholder="ORDER NOTES (OPTIONAL: SIZE, COLOR, OR DELIVERY INSTRUCTIONS)" 
                       class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition resize-none"></textarea>
           </div>
@@ -126,7 +135,7 @@
           </div>
           <div class="flex justify-between text-xs md:text-sm tracking-widest uppercase mb-10 text-gray-400">
             <span>Shipping</span>
-            <span class="text-green-500">FREE</span>
+            <span class="text-green-500 font-bold">FREE</span>
           </div>
 
           <button type="submit" id="submit-btn" class="w-full bg-white text-black py-5 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] hover:bg-gray-200 transition flex items-center justify-center">
@@ -155,10 +164,18 @@
 
         if(form) {
             form.addEventListener('submit', function(e) {
+                // Confirmation logic
+                const isConfirmed = confirm('Ready to place your order? Please ensure your shipping details are correct.');
+                
+                if (!isConfirmed) {
+                    e.preventDefault();
+                    return;
+                }
+
                 if (form.checkValidity()) {
                     btn.disabled = true;
                     btn.classList.add('opacity-50', 'cursor-not-allowed');
-                    btnText.innerHTML = '<div class="loader"></div> Processing...';
+                    btnText.innerHTML = '<div class="loader"></div> Processing Order...';
                 }
             });
         }

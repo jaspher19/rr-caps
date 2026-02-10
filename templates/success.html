@@ -23,10 +23,6 @@
       Thank you for your purchase. A confirmation receipt has been sent to <span class="text-white font-bold">{{ email }}</span> and was received by <span class="text-white font-bold">RCAPS4STREETS</span>.
     </p>
 
-    <p class="text-[9px] text-gray-500 uppercase tracking-widest mb-6 italic">
-        *Check your spam folder if the receipt does not arrive within 5 minutes.
-    </p>
-
     <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-6 text-left">
         <h3 class="text-[9px] tracking-[0.3em] uppercase mb-5 text-gray-500 font-bold">Items Purchased</h3>
         <div class="space-y-4">
@@ -34,28 +30,33 @@
             <div class="flex items-center justify-between group">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-14 bg-[#111] rounded flex items-center justify-center overflow-hidden border border-white/10">
-                        <img src="{{ item.image }}" class="w-4/5 object-contain">
+                        <img src="{{ item.image }}" class="w-4/5 object-contain" alt="{{ item.name }}">
                     </div>
                     <div>
                         <p class="text-[11px] font-bold uppercase tracking-wider text-gray-200">{{ item.name }}</p>
-                        <p class="text-[9px] text-gray-500">Qty: {{ item.qty }} • ₱{{ item.price }}</p>
+                        <p class="text-[9px] text-gray-500">Qty: {{ item.quantity }} • ₱{{ item.price }}</p>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
         
-        <div class="flex justify-between border-t border-white/5 mt-5 pt-4">
-            <span class="text-[9px] uppercase tracking-widest text-gray-500">Total Paid</span>
-            <span class="text-sm font-bold text-white">₱{{ total }}</span>
+        <div class="border-t border-white/5 mt-5 pt-4 space-y-2">
+            <div class="flex justify-between">
+                <span class="text-[9px] uppercase tracking-widest text-gray-500">Payment Method</span>
+                <span class="text-[10px] font-bold text-gray-200 uppercase tracking-tighter">{{ payment_method }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-[9px] uppercase tracking-widest text-gray-500">Total Paid</span>
+                <span class="text-sm font-bold text-white">₱{{ total }}</span>
+            </div>
         </div>
     </div>
 
     <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-10 text-left">
         <p class="text-[9px] tracking-widest text-gray-500 uppercase mb-3">Shipping To:</p>
         <p class="text-xs text-gray-200 leading-relaxed font-medium italic">
-            {{ address }}<br>
-            {{ city }}
+            {{ address }}
         </p>
     </div>
 
