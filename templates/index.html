@@ -56,7 +56,7 @@
 <body class="bg-[#0A0A0A] text-white overflow-x-hidden">
 
   <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-white text-black px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 w-[90%] md:w-auto justify-between md:justify-start">
-      <span class="text-[10px] font-black uppercase tracking-[0.2em]">Added to Cart</span>
+      <span id="toast-msg" class="text-[10px] font-black uppercase tracking-[0.2em]">Added to Cart</span>
       <div class="h-4 w-[1px] bg-black/10 hidden md:block"></div>
       <a href="/cart" class="text-[10px] font-bold uppercase underline">View Cart</a>
   </div>
@@ -120,17 +120,37 @@
       {% for product in products %}
         <div class="group flex flex-col">
           <div class="relative overflow-hidden bg-[#111] aspect-[4/5] flex items-center justify-center rounded-lg">
-            <img src="{{ product.image }}" class="w-3/4 transition duration-700 group-hover:scale-110">
+            <img src="{{ product.image }}" class="w-3/4 transition duration-700 group-hover:scale-110 {% if product.stock <= 0 %}opacity-40 grayscale{% endif %}">
+            
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {% if product.stock <= 0 %}
+                    <span class="bg-black/80 text-white text-[10px] font-black tracking-widest px-4 py-2 border border-white/20">SOLD OUT</span>
+                {% endif %}
+            </div>
+
             <div class="hidden md:block absolute bottom-4 left-4 right-4 translate-y-12 group-hover:translate-y-0 transition duration-500 opacity-0 group-hover:opacity-100">
-                 <button onclick="quickAdd('{{ product.id }}')" class="w-full bg-white text-black py-3 text-[10px] uppercase font-bold">Quick Add +</button>
+                 {% if product.stock > 0 %}
+                    <button onclick="quickAdd('{{ product.id }}')" class="w-full bg-white text-black py-3 text-[10px] uppercase font-bold hover:bg-gray-200">Quick Add +</button>
+                 {% else %}
+                    <button disabled class="w-full bg-white/5 text-gray-500 py-3 text-[10px] uppercase font-bold cursor-not-allowed">Unavailable</button>
+                 {% endif %}
             </div>
           </div>
           <div class="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             <div>
                 <h3 class="text-[11px] md:text-sm font-semibold uppercase truncate w-32 md:w-auto">{{ product.name }}</h3>
-                <p class="text-[10px] font-bold text-gray-300">₱{{ product.price }}</p>
+                <div class="flex items-center gap-3">
+                    <p class="text-[10px] font-bold text-gray-300">₱{{ product.price }}</p>
+                    {% if product.stock > 0 and product.stock <= 5 %}
+                        <span class="text-[9px] font-black text-red-500 uppercase tracking-tighter">{{ product.stock }} LEFT</span>
+                    {% endif %}
+                </div>
             </div>
-            <button onclick="quickAdd('{{ product.id }}')" class="md:hidden w-full bg-white/10 border border-white/20 py-2 text-[9px] uppercase font-bold rounded">Add To Cart</button>
+            {% if product.stock > 0 %}
+                <button onclick="quickAdd('{{ product.id }}')" class="md:hidden w-full bg-white/10 border border-white/20 py-2 text-[9px] uppercase font-bold rounded">Add To Cart</button>
+            {% else %}
+                <button disabled class="md:hidden w-full bg-white/5 border border-white/5 py-2 text-[9px] uppercase font-bold rounded text-gray-600">Sold Out</button>
+            {% endif %}
           </div>
         </div>
       {% endfor %}
@@ -146,11 +166,23 @@
         </div>
         <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
             {% for product in products %}
-            <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                <img src="{{ product.image }}" class="aspect-square object-contain mb-2">
+            <div class="bg-white/5 p-3 rounded-lg border border-white/5 {% if product.stock <= 0 %}opacity-60{% endif %}">
+                <div class="relative">
+                    <img src="{{ product.image }}" class="aspect-square object-contain mb-2 {% if product.stock <= 0 %}grayscale{% endif %}">
+                    {% if product.stock <= 0 %}
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-[8px] font-black bg-black text-white px-2 py-1">SOLD OUT</span>
+                        </div>
+                    {% endif %}
+                </div>
                 <p class="text-[10px] font-bold uppercase truncate">{{ product.name }}</p>
                 <p class="text-[10px] text-gray-400 mb-2">₱{{ product.price }}</p>
-                <button onclick="quickAdd('{{ product.id }}')" class="w-full py-2 bg-white text-black text-[9px] font-bold uppercase">Add</button>
+                
+                {% if product.stock > 0 %}
+                    <button onclick="quickAdd('{{ product.id }}')" class="w-full py-2 bg-white text-black text-[9px] font-bold uppercase hover:bg-gray-200">Add</button>
+                {% else %}
+                    <button disabled class="w-full py-2 bg-white/5 text-gray-600 text-[9px] font-bold uppercase cursor-not-allowed">Sold Out</button>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -174,20 +206,32 @@
             body: formData
         })
         .then(response => {
-            if (!response.ok) throw new Error('Server Error');
-            return response.json();
+            return response.json().then(data => {
+                if (!response.ok) {
+                    throw new Error(data.message || 'Server Error');
+                }
+                return data;
+            });
         })
         .then(data => {
             if (data.status === 'success') {
                 const badges = document.querySelectorAll('.cart-badge');
                 badges.forEach(badge => { badge.innerText = data.cart_count; });
+                
                 const toast = document.getElementById('toast');
+                const toastMsg = document.getElementById('toast-msg');
+                toastMsg.innerText = "Added to Cart";
                 toast.classList.add('show');
                 setTimeout(() => { toast.classList.remove('show'); }, 3000);
             }
         })
         .catch(error => {
-            console.error('Fetch error:', error);
+            // NEW: Handle Stock Error in UI
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            toastMsg.innerText = error.message; // Show "Item Out of Stock"
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
         });
     }
   </script>

@@ -32,19 +32,13 @@ MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def get_clean_image_url(img_path):
-    """Standardizes image paths to fix broken links in Cart and Shop."""
-    if not img_path:
-        return 'https://via.placeholder.com/150'
-    if img_path.startswith('http'):
-        return img_path
-    
+    if not img_path: return 'https://via.placeholder.com/150'
+    if img_path.startswith('http'): return img_path
     clean_path = img_path.lstrip('/')
     if not clean_path.startswith('static/'):
         folder = "images/" if not clean_path.startswith('images/') else ""
         final_path = f"static/{folder}{clean_path}"
-    else:
-        final_path = clean_path
-    
+    else: final_path = clean_path
     return "/" + urllib.parse.quote(final_path)
 
 def send_the_email(order_id, customer_email, total_price, address, phone, items_list, payment_method, proof_url=None):
@@ -67,9 +61,7 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
         </tr>
         """
 
-    proof_link_html = ""
-    if proof_url:
-        proof_link_html = f"<p style='color: #00ffff;'><strong>Proof of Payment:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt Screenshot</a></p>"
+    proof_link_html = f"<p style='color: #00ffff;'><strong>Proof:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt</a></p>" if proof_url else ""
 
     email_html = f"""
     <html>
@@ -79,9 +71,7 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
             <p><strong>Payment Method:</strong> {payment_method}</p>
             {proof_link_html}
             <hr style="border: 1px solid #333;">
-            <table width="100%" style="color: #eee;">
-                {items_html}
-            </table>
+            <table width="100%" style="color: #eee;">{items_html}</table>
             <p><strong>Total Paid: ₱{total_price}</strong></p>
             <p><strong>Shipping to:</strong> {address}</p>
             <p><strong>Phone:</strong> {phone}</p>
@@ -107,6 +97,8 @@ def home():
     all_products = list(products_col.find({}, {'_id': 0}))
     for p in all_products:
         p['image'] = get_clean_image_url(p.get('image'))
+        # Ensure stock defaults to 0 if not present in legacy data
+        p['stock'] = p.get('stock', 0)
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
 
@@ -114,6 +106,13 @@ def home():
 def add_to_cart():
     try:
         pid = request.form.get("id")
+        # Logic check: Verify stock before adding to cart
+        query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
+        product = products_col.find_one(query)
+        
+        if product and product.get('stock', 0) <= 0:
+            return jsonify({"status": "error", "message": "Item Out of Stock"}), 400
+
         cart = session.get("cart", [])
         cart.append(str(pid))
         session["cart"] = cart
@@ -152,8 +151,13 @@ def checkout():
         
         for pid, qty in counts.items():
             query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
-            p = products_col.find_one(query, {'_id': 0})
+            p = products_col.find_one(query)
             if p:
+                # --- AUTO-DEDUCT STOCK ---
+                current_stock = p.get('stock', 0)
+                new_stock = max(0, current_stock - qty)
+                products_col.update_one({"id": p['id']}, {"$set": {"stock": new_stock}})
+
                 total_price += p["price"] * qty
                 items_for_receipt.append({
                     "name": p["name"], 
@@ -164,16 +168,12 @@ def checkout():
         
         full_address = f"{request.form.get('address')}, {request.form.get('city')}, {request.form.get('zip')}"
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
-        
-        # Matches your updated cart.html values: "Cash on Delivery" or "GCash"
         payment_choice = request.form.get("payment_method", "Cash on Delivery")
 
-        # --- UPDATED GCASH RECEIPT UPLOAD TO CLOUDINARY ---
         proof_url = None
         if payment_choice == "GCash":
             file = request.files.get("payment_proof")
             if file and file.filename != '':
-                # Store in a clear folder on Cloudinary
                 upload_result = cloudinary.uploader.upload(file, folder="gcash_receipts")
                 proof_url = upload_result.get("secure_url")
         
@@ -184,14 +184,12 @@ def checkout():
             "address": full_address,
             "total": total_price, 
             "payment_method": payment_choice,
-            "payment_proof": proof_url, # Now stores the Cloudinary link
+            "payment_proof": proof_url,
             "date": datetime.now().strftime("%b %d, %Y %I:%M %p"), 
             "items": items_for_receipt
         }
         
         orders_col.insert_one(order_data)
-        
-        # Email the admin and customer
         send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice, proof_url)
         
         session.pop("cart", None)
@@ -210,10 +208,11 @@ def admin():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     try:
         all_products = list(products_col.find({}))
-        all_orders = list(orders_col.find({}).sort("_id", -1)) # Show newest first
+        all_orders = list(orders_col.find({}).sort("_id", -1))
         for p in all_products:
             p['_id'] = str(p['_id'])
             p['image'] = get_clean_image_url(p.get('image'))
+            p['stock'] = p.get('stock', 0) # Ensure admin sees stock
         for o in all_orders:
             o['_id'] = str(o['_id'])
         return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
@@ -226,10 +225,16 @@ def add_product():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     file = request.files.get("photo")
     image_url = cloudinary.uploader.upload(file)['secure_url'] if file else "https://via.placeholder.com/500"
+    
+    # Updated to capture stock from form
     products_col.insert_one({
-        "id": int(time.time()), "name": request.form.get("name"),
-        "price": int(request.form.get("price", 0)), "image": image_url, 
-        "badge": request.form.get("badge"), "category": request.form.get("category")
+        "id": int(time.time()), 
+        "name": request.form.get("name"),
+        "price": int(request.form.get("price", 0)), 
+        "stock": int(request.form.get("stock", 0)), # Stock capture
+        "image": image_url, 
+        "badge": request.form.get("badge"), 
+        "category": request.form.get("category")
     })
     return redirect(url_for('admin', key=key))
 
@@ -237,9 +242,18 @@ def add_product():
 def edit_price(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    new_price = request.form.get("price")
+    new_price = request.form.get("new_price") # Matches admin.html input name
     if new_price:
         products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/edit_stock/<int:product_id>", methods=["POST"])
+def edit_stock(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    new_stock = request.form.get("new_stock")
+    if new_stock:
+        products_col.update_one({"id": product_id}, {"$set": {"stock": int(new_stock)}})
     return redirect(url_for('admin', key=key))
 
 @app.route("/admin/wipe_orders", methods=["POST"])
