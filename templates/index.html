@@ -97,7 +97,7 @@
           </div>
         </div>
       </div>
-      <a href="/cart" class="group flex items-center gap-2">Cart <span id="cart-count-desktop" class="cart-badge bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></a>
+      <a href="/cart" class="group flex items-center gap-2">Cart <span class="cart-badge bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></a>
     </div>
   </nav>
 
@@ -169,7 +169,7 @@
     }
 
     function quickAdd(productId) {
-        console.log("Adding product:", productId); // Debug log
+        console.log("Attempting to add Product ID:", productId);
         
         const formData = new FormData();
         formData.append('id', productId);
@@ -179,26 +179,33 @@
             body: formData
         })
         .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
+            console.log("Server Response Status:", response.status);
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text || 'Server Error') });
+            }
             return response.json();
         })
         .then(data => {
-            console.log("Server response:", data); // Debug log
+            console.log("Success Data:", data);
             
-            // Update ALL badges with class 'cart-badge'
-            const badges = document.querySelectorAll('.cart-badge');
-            badges.forEach(badge => {
-                badge.innerText = data.cart_count;
-            });
+            if (data.status === 'success') {
+                // Find all elements with the class 'cart-badge'
+                const badges = document.querySelectorAll('.cart-badge');
+                badges.forEach(badge => {
+                    badge.innerText = data.cart_count;
+                });
 
-            // Show Toast
-            const toast = document.getElementById('toast');
-            toast.classList.add('show');
-            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+                // Show Toast
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => { toast.classList.remove('show'); }, 3000);
+            } else {
+                console.error("Server returned success:false", data);
+            }
         })
         .catch(error => {
-            console.error('Fetch error:', error);
-            alert("Could not add to cart. Check console for details.");
+            console.error('Full Error Object:', error);
+            alert("Cart Error: " + error.message);
         });
     }
   </script>
