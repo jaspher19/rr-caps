@@ -77,13 +77,16 @@ def add_to_cart():
         pid = request.form.get("id")
         if not pid:
             return jsonify({"status": "error", "message": "Missing ID"}), 400
+
         cart = session.get("cart", [])
         p = products_col.find_one({"id": int(pid)}) or products_col.find_one({"id": str(pid)})
+        
         if p:
             cart.append(str(pid))
             session["cart"] = cart
             session.modified = True
             return jsonify({"status": "success", "cart_count": len(cart)})
+        
         return jsonify({"status": "error", "message": "Product not found"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -112,7 +115,7 @@ def remove_from_cart():
     pid = request.form.get("id")
     cart = session.get("cart", [])
     if pid in cart:
-        cart.remove(pid) # Removes only ONE instance of the ID
+        cart.remove(pid) # Removes only one instance of the ID
         session["cart"] = cart
         session.modified = True
     return redirect(url_for('view_cart'))
@@ -157,9 +160,17 @@ def checkout():
             "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
+
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
+        
         session.pop("cart", None)
-        return render_template("success.html", order_id=order_id, total=total_price, email=customer_email, address=address, city=city, items=items_for_receipt)
+        return render_template("success.html", 
+                               order_id=order_id, 
+                               total=total_price, 
+                               email=customer_email,
+                               address=address,
+                               city=city,
+                               items=items_for_receipt)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
@@ -178,11 +189,14 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
     file = request.files.get("photo")
     image_url = "https://via.placeholder.com/500" 
+    
     if file:
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
+    
     products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
