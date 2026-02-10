@@ -14,9 +14,9 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026")
 
 # --- CLOUDINARY CONFIG ---
 cloudinary.config( 
-  cloud_name = os.environ.get("CLOUDINARY_NAME"), 
-  api_key = os.environ.get("CLOUDINARY_API_KEY"), 
-  api_secret = os.environ.get("CLOUDINARY_API_SECRET") 
+    cloud_name = os.environ.get("CLOUDINARY_NAME"), 
+    api_key = os.environ.get("CLOUDINARY_API_KEY"), 
+    api_secret = os.environ.get("CLOUDINARY_API_SECRET") 
 )
 
 # --- MONGODB CONFIG ---
@@ -44,21 +44,17 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     email_body = (
         f"Order Confirmation: {order_id}\n"
         f"-----------------------------------\n"
-        f"CUSTOMER DETAILS:\n"
-        f"Email: {customer_email}\n"
-        f"Phone: {phone}\n"
-        f"Address: {address}, {city}\n\n"
-        f"ITEMS ORDERED:\n"
-        f"{items_text}\n"
-        f"-----------------------------------\n"
-        f"GRAND TOTAL: ₱{total_price}\n\n"
+        f"Total: ₱{total_price}\n"
+        f"Address: {address}, {city}\n"
+        f"Phone: {phone}\n\n"
+        f"Items Ordered:\n{items_text}\n\n"
         f"Thank you for shopping with RCAPS4STREETS!"
     )
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
-        "subject": f"Receipt for Order {order_id}",
+        "subject": f"Order Received - {order_id}",
         "textContent": email_body
     }
     try: 
@@ -95,28 +91,32 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
-    # Grouping and counting items in the bag
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
         try:
-            # Look up product by Int or String ID
             p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
-                img_path = item.get('image', '')
+                img = item.get('image', '')
 
-                # --- ADVANCED PHOTO FIX ---
-                # 1. If it's a full URL (Cloudinary), leave it alone
-                if img_path.startswith('http'):
-                    pass
-                # 2. If it starts with 'images/', it's missing the 'static/' prefix
-                elif img_path.startswith('images/'):
-                    item['image'] = '/static/' + img_path
-                # 3. If it's relative but missing the leading slash
-                elif not img_path.startswith('/'):
-                    item['image'] = '/' + img_path
-                
+                # --- ULTIMATE IMAGE FALLBACK LOGIC ---
+                if not img:
+                    item['image'] = 'https://via.placeholder.com/150'
+                elif img.startswith('http'):
+                    # Cloudinary or external link
+                    item['image'] = img
+                else:
+                    # Local file path normalization
+                    clean_img = img.lstrip('/')
+                    if not clean_img.startswith('static/'):
+                        if clean_img.startswith('images/'):
+                            item['image'] = f"/static/{clean_img}"
+                        else:
+                            item['image'] = f"/static/images/{clean_img}"
+                    else:
+                        item['image'] = f"/{clean_img}"
+
                 item['qty'] = qty
                 item['quantity'] = qty 
                 cart_items.append(item)
@@ -165,7 +165,7 @@ def checkout():
                 })
         
         customer_email = request.form.get("email")
-        order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
+        order_id = f"RCAPS-{random.randint(1000, 9999)}"
         
         orders_col.insert_one({
             "order_id": order_id, "email": customer_email, 
@@ -200,10 +200,8 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    
     file = request.files.get("photo")
     image_url = "https://via.placeholder.com/500" 
-    
     if file:
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
