@@ -83,7 +83,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
-            <span class="absolute top-0 right-0 bg-white text-black text-[8px] font-bold h-4 w-4 flex items-center justify-center rounded-full">{{ cart_count if cart_count else 0 }}</span>
+            <span class="cart-badge absolute top-0 right-0 bg-white text-black text-[8px] font-bold h-4 w-4 flex items-center justify-center rounded-full">{{ cart_count if cart_count else 0 }}</span>
         </a>
     </div>
 
@@ -97,7 +97,7 @@
           </div>
         </div>
       </div>
-      <a href="/cart" class="group flex items-center gap-2">Cart <span id="cart-count-desktop" class="bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></a>
+      <a href="/cart" class="group flex items-center gap-2">Cart <span id="cart-count-desktop" class="cart-badge bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></a>
     </div>
   </nav>
 
@@ -169,6 +169,8 @@
     }
 
     function quickAdd(productId) {
+        console.log("Adding product:", productId); // Debug log
+        
         const formData = new FormData();
         formData.append('id', productId);
 
@@ -176,18 +178,28 @@
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(data => {
-            const cartBadges = document.querySelectorAll('#cart-count, #cart-count-desktop, .relative span');
-            cartBadges.forEach(badge => {
-                if(badge) badge.innerText = data.cart_count;
+            console.log("Server response:", data); // Debug log
+            
+            // Update ALL badges with class 'cart-badge'
+            const badges = document.querySelectorAll('.cart-badge');
+            badges.forEach(badge => {
+                badge.innerText = data.cart_count;
             });
 
+            // Show Toast
             const toast = document.getElementById('toast');
             toast.classList.add('show');
             setTimeout(() => { toast.classList.remove('show'); }, 3000);
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert("Could not add to cart. Check console for details.");
+        });
     }
   </script>
 </body>
