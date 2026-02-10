@@ -195,6 +195,11 @@ def add_product():
         "category": request.form.get("category")
     })
     return redirect(url_for('admin', key=key, success=True))
+    @app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    session.modified = True
+    return redirect(url_for('view_cart'))
 
 @app.route("/admin/edit-price/<int:product_id>", methods=["POST"])
 def edit_price(product_id):
