@@ -32,7 +32,10 @@ MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
-    if not BREVO_API_KEY: return
+    if not BREVO_API_KEY: 
+        print("EMAIL ERROR: No BREVO_API_KEY found in Environment Variables.")
+        return
+    
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     
@@ -59,8 +62,11 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         "subject": f"Receipt for Order {order_id}",
         "textContent": email_body
     }
-    try: requests.post(url, json=payload, headers=headers, timeout=15)
-    except Exception as e: print(f"Email Error: {e}")
+    try: 
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        print(f"EMAIL LOG: Status {response.status_code}, Response: {response.text}")
+    except Exception as e: 
+        print(f"EMAIL CRITICAL ERROR: {e}")
 
 # --- SHOP ROUTES ---
 
@@ -102,6 +108,11 @@ def view_cart():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
+                
+                # PHOTO FIX: Ensure path is valid for HTML rendering
+                if item.get('image') and not item['image'].startswith(('http', '/')):
+                    item['image'] = '/' + item['image']
+                
                 item['qty'] = qty
                 item['quantity'] = qty 
                 cart_items.append(item)
@@ -109,13 +120,12 @@ def view_cart():
         except: continue
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
-# --- NEW: REMOVE SINGLE ITEM ROUTE ---
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
     pid = request.form.get("id")
     cart = session.get("cart", [])
     if pid in cart:
-        cart.remove(pid) # Removes only one instance of the ID
+        cart.remove(pid) 
         session["cart"] = cart
         session.modified = True
     return redirect(url_for('view_cart'))
