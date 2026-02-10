@@ -47,7 +47,7 @@ def get_clean_image_url(img_path):
     
     return "/" + urllib.parse.quote(final_path)
 
-def send_the_email(order_id, customer_email, total_price, address, phone, items_list, payment_method):
+def send_the_email(order_id, customer_email, total_price, address, phone, items_list, payment_method, proof_url=None):
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
@@ -67,12 +67,18 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
         </tr>
         """
 
+    # Add link to proof of payment for the admin if it exists
+    proof_link_html = ""
+    if proof_url:
+        proof_link_html = f"<p style='color: #00ffff;'><strong>Proof of Payment:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt Screenshot</a></p>"
+
     email_html = f"""
     <html>
         <body style='background:#000; color:#fff; font-family: sans-serif; padding: 20px;'>
             <h2 style="color: #00ff00;">ORDER CONFIRMED</h2>
             <p>Reference: {order_id}</p>
             <p><strong>Payment Method:</strong> {payment_method}</p>
+            {proof_link_html}
             <hr style="border: 1px solid #333;">
             <table width="100%" style="color: #eee;">
                 {items_html}
@@ -160,8 +166,16 @@ def checkout():
         full_address = f"{request.form.get('address')}, {request.form.get('city')}"
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
         
-        # New: Get payment method from form
         payment_choice = request.form.get("payment_method", "Cash on Delivery")
+
+        # --- HANDLE GCASH RECEIPT UPLOAD ---
+        proof_url = None
+        if payment_choice == "GCash / Instant Pay":
+            file = request.files.get("payment_proof")
+            if file and file.filename != '':
+                # Upload screenshot to a specific folder in Cloudinary
+                upload_result = cloudinary.uploader.upload(file, folder="gcash_receipts")
+                proof_url = upload_result.get("secure_url")
         
         order_data = {
             "order_id": order_id, 
@@ -170,12 +184,15 @@ def checkout():
             "address": full_address,
             "total": total_price, 
             "payment_method": payment_choice,
+            "payment_proof": proof_url,
             "date": datetime.now().strftime("%b %d, %Y"), 
             "items": items_for_receipt
         }
         
         orders_col.insert_one(order_data)
-        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice)
+        
+        # Send email with proof_url included for admin verification
+        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice, proof_url)
         
         session.pop("cart", None)
         session.modified = True

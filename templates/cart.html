@@ -91,7 +91,7 @@
         {% endfor %}
       </div>
 
-      <form id="checkout-form" action="{{ url_for('checkout') }}" method="POST" class="space-y-10">
+      <form id="checkout-form" action="{{ url_for('checkout') }}" method="POST" enctype="multipart/form-data" class="space-y-10">
         <div class="border-t border-white/10 pt-10">
           <h3 class="text-[10px] tracking-[0.3em] uppercase mb-8 text-white font-bold">Contact & Shipping</h3>
           
@@ -116,11 +116,29 @@
 
             <div class="pt-4">
                 <label class="text-[9px] text-gray-500 tracking-widest uppercase mb-2 block font-bold">Payment Method</label>
-                <select name="payment_method" required
+                <select id="payment-method" name="payment_method" required
                         class="w-full bg-[#0F0F0F] border border-white/10 px-5 py-4 text-[11px] tracking-widest focus:outline-none focus:border-white/40 transition cursor-pointer text-white">
                     <option value="Cash on Delivery">Cash on Delivery (COD)</option>
                     <option value="GCash / Instant Pay">GCash / Instant Pay</option>
                 </select>
+            </div>
+
+            <div id="gcash-qr-area" class="hidden mt-6 p-6 bg-[#0F0F0F] border border-blue-500/20 rounded-lg text-center">
+                <p class="text-[10px] text-blue-400 font-bold uppercase tracking-[0.2em] mb-4">Scan to Pay Exact Amount</p>
+                <div class="inline-block p-3 bg-white rounded-lg mb-4">
+                    <img id="dynamic-qr" src="" alt="GCash QR Code" class="w-48 h-48 object-contain">
+                </div>
+                <div class="space-y-1 mb-6">
+                    <p class="text-[16px] text-white font-black tracking-tighter">TOTAL: ₱{{ total_price }}</p>
+                    <p class="text-[11px] text-gray-400 uppercase tracking-widest">Name: RCAPS4STREET</p>
+                    <p class="text-[11px] text-gray-400 uppercase tracking-widest">GCash: 0923 525 1098</p>
+                </div>
+                
+                <div class="text-left border-t border-white/5 pt-6">
+                    <label class="text-[9px] text-gray-500 tracking-widest uppercase mb-2 block font-bold">Upload GCash Screenshot (Required)</label>
+                    <input type="file" name="payment_proof" id="payment_proof" accept="image/*"
+                           class="w-full text-[10px] text-gray-400 file:mr-4 file:py-2 file:px-4 file:border-0 file:bg-white file:text-black file:font-bold file:uppercase file:text-[9px]">
+                </div>
             </div>
 
             <textarea name="description" rows="3" placeholder="ORDER NOTES (OPTIONAL: SIZE, COLOR, OR DELIVERY INSTRUCTIONS)" 
@@ -159,13 +177,30 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('checkout-form');
-        const btn = document.getElementById('submit-btn');
-        const btnText = document.getElementById('btn-text');
+        const paymentSelect = document.getElementById('payment-method');
+        const qrArea = document.getElementById('gcash-qr-area');
+        const qrImg = document.getElementById('dynamic-qr');
+        const proofInput = document.getElementById('payment_proof');
+
+        // Config
+        const gcashNumber = "09235251098"; 
+        const amount = "{{ total_price }}";
+
+        paymentSelect.addEventListener('change', function() {
+            if (this.value === 'GCash / Instant Pay') {
+                const qrData = `GCASH|${gcashNumber}|${amount}|RCAPS4STREET`;
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}&margin=10`;
+                qrArea.classList.remove('hidden');
+                proofInput.required = true;
+            } else {
+                qrArea.classList.add('hidden');
+                proofInput.required = false;
+            }
+        });
 
         if(form) {
             form.addEventListener('submit', function(e) {
-                // Confirmation logic
-                const isConfirmed = confirm('Ready to place your order? Please ensure your shipping details are correct.');
+                const isConfirmed = confirm('Ready to place your order? Please ensure all details are correct.');
                 
                 if (!isConfirmed) {
                     e.preventDefault();
@@ -173,6 +208,8 @@
                 }
 
                 if (form.checkValidity()) {
+                    const btn = document.getElementById('submit-btn');
+                    const btnText = document.getElementById('btn-text');
                     btn.disabled = true;
                     btn.classList.add('opacity-50', 'cursor-not-allowed');
                     btnText.innerHTML = '<div class="loader"></div> Processing Order...';
