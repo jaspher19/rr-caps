@@ -20,7 +20,6 @@
       animation: marquee 20s linear infinite;
     }
 
-    /* Improved Dropdown for Mobile */
     .dropdown-content {
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       transform: translateY(10px);
@@ -122,7 +121,7 @@
         {% if loop.index <= 6 %}
         <div class="group flex flex-col">
           <div class="relative overflow-hidden bg-[#111] aspect-[4/5] flex items-center justify-center rounded-lg">
-            <img src="{{ url_for('static', filename=product.image) }}" class="w-3/4 transition duration-700">
+            <img src="{{ product.image }}" class="w-3/4 transition duration-700 group-hover:scale-110">
             
             <div class="hidden md:block absolute bottom-4 left-4 right-4 translate-y-12 group-hover:translate-y-0 transition duration-500 opacity-0 group-hover:opacity-100">
                  <button onclick="quickAdd('{{ product.id }}')" class="w-full bg-white text-black py-3 text-[10px] uppercase font-bold">Quick Add +</button>
@@ -151,7 +150,7 @@
         <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
             {% for product in products %}
             <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                <img src="{{ url_for('static', filename=product.image) }}" class="aspect-square object-contain mb-2">
+                <img src="{{ product.image }}" class="aspect-square object-contain mb-2">
                 <p class="text-[10px] font-bold uppercase truncate">{{ product.name }}</p>
                 <p class="text-[10px] text-gray-400 mb-2">₱{{ product.price }}</p>
                 <button onclick="quickAdd('{{ product.id }}')" class="w-full py-2 bg-white text-black text-[9px] font-bold uppercase">Add</button>
@@ -179,7 +178,6 @@
         })
         .then(response => response.json())
         .then(data => {
-            // Update mobile cart count
             const cartBadges = document.querySelectorAll('#cart-count, #cart-count-desktop, .relative span');
             cartBadges.forEach(badge => {
                 if(badge) badge.innerText = data.cart_count;

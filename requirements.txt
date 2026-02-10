@@ -21,3 +21,4 @@ werkzeug
 pymongo[srv]
 dnspython
 certifi
+cloudinary

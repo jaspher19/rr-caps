@@ -5,11 +5,21 @@ import random, os, time
 from datetime import datetime
 from pymongo import MongoClient
 import certifi
+import cloudinary
+import cloudinary.uploader
 
 app = Flask(__name__)
-# The secret key encrypts the session cookie so users can't modify their own cart data
+# The secret key encrypts the session cookie
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
+
+# --- CLOUDINARY CONFIG ---
+# Add these to your Render Environment Variables
+cloudinary.config( 
+  cloud_name = os.environ.get("CLOUDINARY_NAME"), 
+  api_key = os.environ.get("CLOUDINARY_API_KEY"), 
+  api_secret = os.environ.get("CLOUDINARY_API_SECRET") 
+)
 
 # --- MONGODB CONFIG ---
 ca = certifi.where()
@@ -19,25 +29,15 @@ db = client['rcaps_database']
 products_col = db['products']   
 orders_col = db['orders']       
 
-# --- FILE CONFIG ---
-UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/images/products')
-if not os.path.exists(UPLOAD_FOLDER): 
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 # --- EMAIL CONFIG ---
 MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
-# --- ENHANCED EMAIL FUNCTION ---
 def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
     if not BREVO_API_KEY: return
-    
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
-    
     items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}" for item in items_list])
-    
     email_body = (
         f"Order Confirmation: {order_id}\n"
         f"-----------------------------------\n"
@@ -52,7 +52,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         f"GRAND TOTAL: ₱{total_price}\n\n"
         f"Thank you for shopping with RCAPS4STREETS!"
     )
-
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
@@ -69,7 +68,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
 @app.route("/shop")
 def home():
     all_products = list(products_col.find({}, {'_id': 0}))
-    # Get count of total items in the user's private session cart
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
 
@@ -78,10 +76,7 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
-    
-    # Count occurrences of each ID in the session list
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
-    
     for pid, qty in counts.items():
         try:
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
@@ -95,18 +90,13 @@ def view_cart():
 
 @app.route("/add-to-cart", methods=["POST"])
 def add_to_cart():
-    # Initialize a new list in this user's session if it doesn't exist
-    if "cart" not in session:
-        session["cart"] = []
-    
+    if "cart" not in session: session["cart"] = []
     product_id = request.form.get("id")
     if product_id:
-        # We must re-assign the session variable to trigger the 'modified' flag
         cart = session["cart"]
         cart.append(str(product_id))
         session["cart"] = cart
         session.modified = True
-        
     return jsonify({"status": "success", "cart_count": len(session["cart"])})
 
 @app.route("/remove-from-cart", methods=["POST"])
@@ -130,44 +120,29 @@ def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
-        
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
-        
         for pid, qty in counts.items():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                items_for_receipt.append({
-                    "name": p["name"],
-                    "price": p["price"],
-                    "qty": qty
-                })
+                items_for_receipt.append({"name": p["name"], "price": p["price"], "qty": qty})
         
         customer_email = request.form.get("email")
         phone = request.form.get("phone", "N/A")
         address = request.form.get("address", "N/A")
         city = request.form.get("city", "N/A")
         description = request.form.get("description", "No extra details")
-        
         order_id = f"RCAPS-{datetime.now().year}-{random.randint(1000, 9999)}"
         
         orders_col.insert_one({
-            "order_id": order_id, 
-            "email": customer_email,
-            "phone": phone,
-            "address": address, 
-            "city": city,
-            "description": description,
-            "items": items_for_receipt,
-            "total": total_price, 
+            "order_id": order_id, "email": customer_email, "phone": phone,
+            "address": address, "city": city, "description": description,
+            "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
-        
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
-        
-        # Clear only this specific customer's cart after successful purchase
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, total=total_price, email=customer_email)
     except Exception as e:
@@ -188,29 +163,30 @@ def admin():
 def add_product():
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    
     file = request.files.get("photo")
-    image_path = "images/products/default.jpg"
+    image_url = "https://via.placeholder.com/500" # Fallback
+    
     if file:
-        filename = secure_filename(file.filename)
-        unique_name = f"{int(time.time())}_{filename}"
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
-        image_path = f"images/products/{unique_name}"
+        # Upload directly to Cloudinary
+        upload_result = cloudinary.uploader.upload(file)
+        image_url = upload_result['secure_url']
     
     products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
         "price": int(request.form.get("price", 0)),
-        "image": image_path,
+        "image": image_url, # Now storing the permanent Cloudinary Link
         "badge": request.form.get("badge"),
         "category": request.form.get("category")
     })
-    return redirect(url_for('admin', key=key))
+    return redirect(url_for('admin', key=key, success=True))
 
 @app.route("/admin/edit-price/<int:product_id>", methods=["POST"])
 def edit_price(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    new_price = request.form.get("new_price") # Fixed to match HTML input name
+    new_price = request.form.get("new_price")
     products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
     return redirect(url_for('admin', key=key))
 
@@ -221,7 +197,12 @@ def delete_product(product_id):
     products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
+@app.route("/wipe_orders/<key>", methods=["POST"])
+def wipe_orders(key):
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    orders_col.delete_many({})
+    return redirect(url_for('admin', key=key))
+
 if __name__ == "__main__":
-    # Get port from environment variable for Render deployment
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
