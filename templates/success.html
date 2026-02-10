@@ -6,6 +6,11 @@
   <title>Order Confirmed | RCAPS4STREET</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    /* Drip Glow Effect */
+    .stamp-glow-paid { box-shadow: 0 0 20px rgba(34, 197, 94, 0.2); }
+    .stamp-glow-topay { box-shadow: 0 0 20px rgba(234, 179, 8, 0.2); }
+  </style>
 </head>
 <body class="bg-[#0A0A0A] text-white flex items-center justify-center min-h-screen py-20">
 
@@ -16,14 +21,21 @@
         </div>
     </div>
 
-    <p class="text-[10px] tracking-[0.5em] uppercase text-green-500 font-bold mb-4 italic">Verification Complete</p>
+    <div class="mb-6 flex justify-center">
+        <div class="{% if payment_status == 'PAID' %} border-green-500 text-green-500 stamp-glow-paid {% else %} border-yellow-500 text-yellow-500 stamp-glow-topay {% endif %} 
+                    border-4 px-6 py-1 rounded-md transform -rotate-12 font-black text-2xl tracking-tighter uppercase opacity-90">
+            {{ payment_status }}
+        </div>
+    </div>
+
+    <p class="text-[10px] tracking-[0.5em] uppercase text-gray-500 font-bold mb-4 italic">Verification Complete</p>
     <h1 class="text-4xl font-extrabold tracking-tighter uppercase mb-6">Order Confirmed</h1>
     
     <p class="text-gray-400 text-sm leading-relaxed mb-8">
       Thank you for your purchase. A confirmation receipt has been sent to <span class="text-white font-bold">{{ email }}</span> and was received by <span class="text-white font-bold">RCAPS4STREETS</span>.
     </p>
 
-    <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-6 text-left">
+    <div class="bg-[#0F0F0F] border border-white/5 rounded-lg p-6 mb-6 text-left relative overflow-hidden">
         <h3 class="text-[9px] tracking-[0.3em] uppercase mb-5 text-gray-500 font-bold">Items Purchased</h3>
         <div class="space-y-4">
             {% for item in items %}
@@ -47,7 +59,7 @@
                 <span class="text-[10px] font-bold text-gray-200 uppercase tracking-tighter">{{ payment_method }}</span>
             </div>
             <div class="flex justify-between">
-                <span class="text-[9px] uppercase tracking-widest text-gray-500">Total Paid</span>
+                <span class="text-[9px] uppercase tracking-widest text-gray-500">Amount Due</span>
                 <span class="text-sm font-bold text-white">₱{{ total }}</span>
             </div>
         </div>

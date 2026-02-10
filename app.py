@@ -41,12 +41,15 @@ def get_clean_image_url(img_path):
     else: final_path = clean_path
     return "/" + urllib.parse.quote(final_path)
 
-# UPDATED: Added customer_name to parameters
 def send_the_email(order_id, customer_email, customer_name, total_price, address, phone, items_list, payment_method, proof_url=None):
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     
+    # NEW: Determine status for the email stamp
+    payment_status = "PAID" if payment_method == "GCash" else "TO PAY"
+    status_color = "#00ff00" if payment_status == "PAID" else "#ffaa00"
+
     items_html = ""
     for item in items_list:
         img_src = item.get('image', 'https://via.placeholder.com/50')
@@ -64,18 +67,20 @@ def send_the_email(order_id, customer_email, customer_name, total_price, address
 
     proof_link_html = f"<p style='color: #00ffff;'><strong>Proof:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt</a></p>" if proof_url else ""
 
-    # UPDATED: Included Customer Name in the HTML body
     email_html = f"""
     <html>
         <body style='background:#000; color:#fff; font-family: sans-serif; padding: 20px;'>
-            <h2 style="color: #00ff00;">ORDER CONFIRMED</h2>
+            <div style="border: 2px solid {status_color}; color: {status_color}; padding: 10px; display: inline-block; margin-bottom: 20px; font-weight: bold; text-transform: uppercase;">
+                {payment_status}
+            </div>
+            <h2 style="color: #fff;">ORDER CONFIRMED</h2>
             <p>Reference: {order_id}</p>
             <p><strong>Customer:</strong> {customer_name}</p>
             <p><strong>Payment Method:</strong> {payment_method}</p>
             {proof_link_html}
             <hr style="border: 1px solid #333;">
             <table width="100%" style="color: #eee;">{items_html}</table>
-            <p><strong>Total Paid: ₱{total_price}</strong></p>
+            <p><strong>Total Due: ₱{total_price}</strong></p>
             <p><strong>Shipping to:</strong> {address}</p>
             <p><strong>Phone:</strong> {phone}</p>
         </body>
@@ -86,7 +91,7 @@ def send_the_email(order_id, customer_email, customer_name, total_price, address
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
-        "subject": f"Receipt: {order_id} - {customer_name}",
+        "subject": f"[{payment_status}] Receipt: {order_id} - {customer_name}",
         "htmlContent": email_html
     }
     try: requests.post(url, json=payload, headers=headers, timeout=15)
@@ -146,9 +151,7 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for('home'))
 
-        # NEW: Capture Customer Name from Form
         customer_name = request.form.get("customer_name")
-
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
@@ -173,6 +176,9 @@ def checkout():
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
         payment_choice = request.form.get("payment_method", "Cash on Delivery")
 
+        # NEW: Logic for Receipt Status
+        payment_status = "PAID" if payment_choice == "GCash" else "TO PAY"
+
         proof_url = None
         if payment_choice == "GCash":
             file = request.files.get("payment_proof")
@@ -182,12 +188,13 @@ def checkout():
         
         order_data = {
             "order_id": order_id, 
-            "customer_name": customer_name, # NEW: Save name to order
+            "customer_name": customer_name,
             "email": request.form.get("email"),
             "phone": request.form.get("phone"),
             "address": full_address,
             "total": total_price, 
             "payment_method": payment_choice,
+            "payment_status": payment_status, # NEW: Save status to DB
             "payment_proof": proof_url,
             "date": datetime.now().strftime("%b %d, %Y %I:%M %p"), 
             "items": items_for_receipt
@@ -195,7 +202,6 @@ def checkout():
         
         orders_col.insert_one(order_data)
         
-        # UPDATED: Pass customer_name to the email function
         send_the_email(
             order_id, 
             order_data['email'], 
