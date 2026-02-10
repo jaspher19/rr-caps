@@ -55,14 +55,16 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     items_html = ""
     for item in items_list:
         img_src = item.get('image', 'https://via.placeholder.com/50')
+        # Using 'quantity' to match the updated dictionary keys
+        qty = item.get('quantity', 1)
         items_html += f"""
         <tr>
             <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee;">
                 <img src="{img_src}" width="40" style="vertical-align:middle; border-radius:5px; margin-right:10px;">
                 {item['name']}
             </td>
-            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: center;">x{item['qty']}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: right;">₱{item['price'] * item['qty']}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: center;">x{qty}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: right;">₱{item['price'] * qty}</td>
         </tr>
         """
 
@@ -105,6 +107,7 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
+    # Grouping IDs and counting them
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
@@ -113,7 +116,8 @@ def view_cart():
         if p:
             item = p.copy()
             item['image'] = get_clean_image_url(item.get('image'))
-            item['qty'] = qty
+            # CRITICAL FIX: Named 'quantity' to match cart.html template
+            item['quantity'] = qty
             cart_items.append(item)
             total_price += p["price"] * qty
     return render_template("cart.html", cart=cart_items, total_price=total_price)
@@ -132,15 +136,25 @@ def checkout():
             if p:
                 total_price += p["price"] * qty
                 items_for_receipt.append({
-                    "name": p["name"], "price": p["price"], "qty": qty, 
+                    "name": p["name"], 
+                    "price": p["price"], 
+                    "quantity": qty, # Consistent naming
                     "image": get_clean_image_url(p.get("image"))
                 })
         
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
-        orders_col.insert_one({
-            "order_id": order_id, "email": request.form.get("email"),
-            "total": total_price, "date": datetime.now().strftime("%b %d, %Y"), "items": items_for_receipt
-        })
+        order_data = {
+            "order_id": order_id, 
+            "email": request.form.get("email"),
+            "total": total_price, 
+            "date": datetime.now().strftime("%b %d, %Y"), 
+            "items": items_for_receipt
+        }
+        orders_col.insert_one(order_data)
+        
+        # Email customer
+        send_the_email(order_id, order_data['email'], total_price, "", "", "", "", items_for_receipt)
+        
         session.pop("cart", None)
         return render_template("success.html", order_id=order_id, total=total_price)
     except: return redirect(url_for('home'))
