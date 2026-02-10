@@ -56,7 +56,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     items_html = ""
     for item in items_list:
         img_url = item.get('image', 'https://via.placeholder.com/100')
-        # Absolute URLs for email clients
         img_src = img_url if img_url.startswith('http') else "https://via.placeholder.com/50"
         
         items_html += f"""
@@ -203,10 +202,23 @@ def checkout():
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    all_products = list(products_col.find({}, {'_id': 0}))
-    all_orders = list(orders_col.find({}, {'_id': 0}).sort("date", -1))
-    return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
+    if key != ADMIN_PASSWORD: 
+        return "Unauthorized", 403
+    
+    try:
+        all_products = list(products_col.find({}))
+        all_orders = list(orders_col.find({}).sort("date", -1))
+        
+        # Convert MongoDB ObjectId to string for safe rendering
+        for p in all_products:
+            if '_id' in p: p['_id'] = str(p['_id'])
+        for o in all_orders:
+            if '_id' in o: o['_id'] = str(o['_id'])
+
+        return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
+    except Exception as e:
+        print(f"ADMIN PAGE ERROR: {e}")
+        return f"Admin Panel Error: {e}", 500
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
