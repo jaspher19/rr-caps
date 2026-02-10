@@ -209,7 +209,6 @@ def admin():
         all_products = list(products_col.find({}))
         all_orders = list(orders_col.find({}).sort("date", -1))
         
-        # Convert MongoDB ObjectId to string for safe rendering
         for p in all_products:
             if '_id' in p: p['_id'] = str(p['_id'])
         for o in all_orders:
@@ -258,6 +257,13 @@ def delete_product(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     products_col.delete_one({"id": product_id})
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/wipe_orders", methods=["POST"])
+def wipe_orders():
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    orders_col.delete_many({})
     return redirect(url_for('admin', key=key))
 
 # --- HELPER ROUTES ---
