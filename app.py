@@ -71,7 +71,6 @@ def home():
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
 
-# --- NEW: ADD TO CART ROUTE (FIXES YOUR 404) ---
 @app.route("/add-to-cart", methods=["POST"])
 def add_to_cart():
     try:
@@ -79,22 +78,17 @@ def add_to_cart():
         if not pid:
             return jsonify({"status": "error", "message": "Missing ID"}), 400
 
-        # Create/Get session cart
         cart = session.get("cart", [])
-        
-        # Verify product exists in DB before adding
-        # We check both int and str versions of the ID for safety
         p = products_col.find_one({"id": int(pid)}) or products_col.find_one({"id": str(pid)})
         
         if p:
-            cart.append(str(pid)) # We store the ID as a string in the session
+            cart.append(str(pid))
             session["cart"] = cart
             session.modified = True
             return jsonify({"status": "success", "cart_count": len(cart)})
         
-        return jsonify({"status": "error", "message": "Product not found in database"}), 404
+        return jsonify({"status": "error", "message": "Product not found"}), 404
     except Exception as e:
-        print(f"Cart Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/cart")
@@ -105,7 +99,6 @@ def view_cart():
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     for pid, qty in counts.items():
         try:
-            # Check both int and str to find product
             p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
@@ -114,6 +107,12 @@ def view_cart():
                 total_price += p["price"] * qty
         except: continue
     return render_template("cart.html", cart=cart_items, total_price=total_price)
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    session.modified = True
+    return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
@@ -195,11 +194,6 @@ def add_product():
         "category": request.form.get("category")
     })
     return redirect(url_for('admin', key=key, success=True))
-    @app.route("/empty-cart", methods=["POST"])
-def empty_cart():
-    session.pop("cart", None)
-    session.modified = True
-    return redirect(url_for('view_cart'))
 
 @app.route("/admin/edit-price/<int:product_id>", methods=["POST"])
 def edit_price(product_id):
