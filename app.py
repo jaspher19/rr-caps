@@ -128,6 +128,7 @@ def view_cart():
         p = products_col.find_one(query, {'_id': 0})
         if p:
             item = p.copy()
+            # FIX: Properly applying image standardization for the cart view
             item['image'] = get_clean_image_url(item.get('image'))
             item['quantity'] = qty
             cart_items.append(item)
