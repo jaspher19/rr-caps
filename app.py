@@ -67,7 +67,6 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
         </tr>
         """
 
-    # Add link to proof of payment for the admin if it exists
     proof_link_html = ""
     if proof_url:
         proof_link_html = f"<p style='color: #00ffff;'><strong>Proof of Payment:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt Screenshot</a></p>"
@@ -163,17 +162,18 @@ def checkout():
                     "image": get_clean_image_url(p.get("image"))
                 })
         
-        full_address = f"{request.form.get('address')}, {request.form.get('city')}"
+        full_address = f"{request.form.get('address')}, {request.form.get('city')}, {request.form.get('zip')}"
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
         
+        # Matches your updated cart.html values: "Cash on Delivery" or "GCash"
         payment_choice = request.form.get("payment_method", "Cash on Delivery")
 
-        # --- HANDLE GCASH RECEIPT UPLOAD ---
+        # --- UPDATED GCASH RECEIPT UPLOAD TO CLOUDINARY ---
         proof_url = None
-        if payment_choice == "GCash / Instant Pay":
+        if payment_choice == "GCash":
             file = request.files.get("payment_proof")
             if file and file.filename != '':
-                # Upload screenshot to a specific folder in Cloudinary
+                # Store in a clear folder on Cloudinary
                 upload_result = cloudinary.uploader.upload(file, folder="gcash_receipts")
                 proof_url = upload_result.get("secure_url")
         
@@ -184,14 +184,14 @@ def checkout():
             "address": full_address,
             "total": total_price, 
             "payment_method": payment_choice,
-            "payment_proof": proof_url,
-            "date": datetime.now().strftime("%b %d, %Y"), 
+            "payment_proof": proof_url, # Now stores the Cloudinary link
+            "date": datetime.now().strftime("%b %d, %Y %I:%M %p"), 
             "items": items_for_receipt
         }
         
         orders_col.insert_one(order_data)
         
-        # Send email with proof_url included for admin verification
+        # Email the admin and customer
         send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice, proof_url)
         
         session.pop("cart", None)
@@ -210,7 +210,7 @@ def admin():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     try:
         all_products = list(products_col.find({}))
-        all_orders = list(orders_col.find({}).sort("date", -1))
+        all_orders = list(orders_col.find({}).sort("_id", -1)) # Show newest first
         for p in all_products:
             p['_id'] = str(p['_id'])
             p['image'] = get_clean_image_url(p.get('image'))
