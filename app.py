@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, jsonify
 import requests
 from werkzeug.utils import secure_filename
-import random, os, time
+import random, os, time, urllib.parse
 from datetime import datetime
 from pymongo import MongoClient
 import certifi
@@ -33,7 +33,7 @@ BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
     if not BREVO_API_KEY: 
-        print("EMAIL ERROR: No BREVO_API_KEY found in Environment Variables.")
+        print("EMAIL ERROR: No BREVO_API_KEY found.")
         return
     
     url = "https://api.brevo.com/v3/smtp/email"
@@ -58,10 +58,9 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         "textContent": email_body
     }
     try: 
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        print(f"EMAIL LOG: Status {response.status_code}, Response: {response.text}")
+        requests.post(url, json=payload, headers=headers, timeout=15)
     except Exception as e: 
-        print(f"EMAIL CRITICAL ERROR: {e}")
+        print(f"EMAIL ERROR: {e}")
 
 # --- SHOP ROUTES ---
 
@@ -76,8 +75,7 @@ def home():
 def add_to_cart():
     try:
         pid = request.form.get("id")
-        if not pid:
-            return jsonify({"status": "error", "message": "Missing ID"}), 400
+        if not pid: return jsonify({"status": "error"}), 400
         cart = session.get("cart", [])
         cart.append(str(pid))
         session["cart"] = cart
@@ -95,35 +93,34 @@ def view_cart():
     
     for pid, qty in counts.items():
         try:
-            p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
+            # Flexible ID lookup to catch both string and int types in DB
+            query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
+            p = products_col.find_one(query, {'_id': 0})
+            
             if p:
                 item = p.copy()
                 img = item.get('image', '')
 
-                # --- ULTIMATE IMAGE FALLBACK LOGIC ---
+                # --- FIX: Safe URL encoding for filenames with ' or spaces ---
                 if not img:
                     item['image'] = 'https://via.placeholder.com/150'
                 elif img.startswith('http'):
-                    # Cloudinary or external link
                     item['image'] = img
                 else:
-                    # Local file path normalization
-                    clean_img = img.lstrip('/')
-                    if not clean_img.startswith('static/'):
-                        if clean_img.startswith('images/'):
-                            item['image'] = f"/static/{clean_img}"
-                        else:
-                            item['image'] = f"/static/images/{clean_img}"
+                    clean_path = img.lstrip('/')
+                    if not clean_path.startswith('static/'):
+                        folder = "images/" if not clean_path.startswith('images/') else ""
+                        final_path = f"static/{folder}{clean_path}"
                     else:
-                        item['image'] = f"/{clean_img}"
+                        final_path = clean_path
+                    
+                    # Convert ' to %27 so the browser finds the file
+                    item['image'] = "/" + urllib.parse.quote(final_path)
 
                 item['qty'] = qty
-                item['quantity'] = qty 
                 cart_items.append(item)
                 total_price += p["price"] * qty
-        except Exception as e: 
-            print(f"Cart Item Error: {e}")
-            continue
+        except: continue
             
     return render_template("cart.html", cart=cart_items, total_price=total_price)
 
@@ -140,7 +137,6 @@ def remove_from_cart():
 @app.route("/empty-cart", methods=["POST"])
 def empty_cart():
     session.pop("cart", None)
-    session.modified = True
     return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
@@ -154,39 +150,27 @@ def checkout():
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
         
         for pid, qty in counts.items():
-            p = products_col.find_one({"id": int(pid)}, {'_id': 0}) or products_col.find_one({"id": str(pid)}, {'_id': 0})
+            query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
+            p = products_col.find_one(query, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                items_for_receipt.append({
-                    "name": p["name"], 
-                    "price": p["price"], 
-                    "qty": qty,
-                    "image": p.get("image", "")
-                })
+                items_for_receipt.append({"name": p["name"], "price": p["price"], "qty": qty})
         
-        customer_email = request.form.get("email")
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
-        
         orders_col.insert_one({
-            "order_id": order_id, "email": customer_email, 
-            "phone": request.form.get("phone", "N/A"),
-            "address": request.form.get("address", "N/A"), 
-            "city": request.form.get("city", "N/A"),
+            "order_id": order_id, "email": request.form.get("email"), 
             "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
 
-        send_the_email(order_id, customer_email, total_price, 
+        send_the_email(order_id, request.form.get("email"), total_price, 
                        request.form.get("address"), request.form.get("city"), 
                        request.form.get("phone"), "", items_for_receipt)
         
         session.pop("cart", None)
-        return render_template("success.html", order_id=order_id, total=total_price, email=customer_email)
-    except Exception as e:
-        print(f"Checkout Error: {e}")
+        return render_template("success.html", order_id=order_id, total=total_price)
+    except:
         return redirect(url_for('home'))
-
-# --- ADMIN ROUTES ---
 
 @app.route("/admin")
 def admin():
@@ -203,18 +187,15 @@ def add_product():
     file = request.files.get("photo")
     image_url = "https://via.placeholder.com/500" 
     if file:
-        upload_result = cloudinary.uploader.upload(file)
-        image_url = upload_result['secure_url']
+        res = cloudinary.uploader.upload(file)
+        image_url = res['secure_url']
     
     products_col.insert_one({
-        "id": int(time.time()), 
-        "name": request.form.get("name"),
-        "price": int(request.form.get("price", 0)),
-        "image": image_url, 
-        "badge": request.form.get("badge"),
-        "category": request.form.get("category")
+        "id": int(time.time()), "name": request.form.get("name"),
+        "price": int(request.form.get("price", 0)), "image": image_url, 
+        "badge": request.form.get("badge"), "category": request.form.get("category")
     })
-    return redirect(url_for('admin', key=key, success=True))
+    return redirect(url_for('admin', key=key))
 
 @app.route("/admin/delete/<int:product_id>", methods=["POST"])
 def delete_product(product_id):
@@ -224,5 +205,4 @@ def delete_product(product_id):
     return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
