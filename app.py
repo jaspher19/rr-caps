@@ -32,7 +32,7 @@ MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def get_clean_image_url(img_path):
-    """Fixes broken image paths for both Local and Cloudinary."""
+    """Standardizes image paths to fix broken links in Cart and Shop."""
     if not img_path:
         return 'https://via.placeholder.com/150'
     if img_path.startswith('http'):
@@ -55,10 +55,8 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     
     items_html = ""
     for item in items_list:
-        # Get the cleaned image URL
         img_url = item.get('image', 'https://via.placeholder.com/100')
-        # Note: External email clients often block local /static/ links. 
-        # For local files, we use a placeholder or absolute URL if available.
+        # Absolute URLs for email clients
         img_src = img_url if img_url.startswith('http') else "https://via.placeholder.com/50"
         
         items_html += f"""
@@ -77,7 +75,7 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     <body style="background-color: #000; color: #ffffff; font-family: 'Arial', sans-serif; padding: 20px;">
         <div style="max-width: 600px; margin: auto; background: #111; padding: 30px; border-radius: 10px; border: 1px solid #222;">
             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #2ecc71; padding-bottom: 20px;">
-                <h1 style="color: #2ecc71; margin: 0; letter-spacing: 2px;">ORDER CONFIRMED</h1>
+                <h1 style="color: #2ecc71; margin: 0; letter-spacing: 2px;">ORDER RECEIVED</h1>
                 <p style="color: #888;">Order ID: {order_id}</p>
             </div>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -93,11 +91,11 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
             <div style="text-align: right; font-size: 20px; color: #2ecc71;">
                 <strong>TOTAL: ₱{total_price}</strong>
             </div>
-            <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; color: #ccc; background: #1a1a1a; padding: 15px; border-radius: 8px;">
-                <h3 style="color: #fff; margin-bottom: 10px;">Shipping Details</h3>
-                <p style="margin: 5px 0;"><strong>Phone:</strong> {phone}</p>
-                <p style="margin: 5px 0;"><strong>Address:</strong> {address}, {city}</p>
-                <p style="margin: 5px 0; font-style: italic; color: #888;">Note: {description}</p>
+            <div style="margin-top: 30px; background: #1a1a1a; padding: 15px; border-radius: 8px; color: #ccc;">
+                <h3 style="color: #fff; margin-top: 0;">Shipping Details</h3>
+                <p><strong>Phone:</strong> {phone}</p>
+                <p><strong>Address:</strong> {address}, {city}</p>
+                <p style="font-style: italic;">Note: {description}</p>
             </div>
         </div>
     </body>
@@ -123,6 +121,19 @@ def home():
     all_products = list(products_col.find({}, {'_id': 0}))
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
+
+@app.route("/add-to-cart", methods=["POST"])
+def add_to_cart():
+    try:
+        pid = request.form.get("id")
+        if not pid: return jsonify({"status": "error"}), 400
+        cart = session.get("cart", [])
+        cart.append(str(pid))
+        session["cart"] = cart
+        session.modified = True
+        return jsonify({"status": "success", "cart_count": len(cart)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/cart")
 def view_cart():
@@ -160,12 +171,11 @@ def checkout():
             p = products_col.find_one(query, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                clean_img = get_clean_image_url(p.get("image"))
                 items_for_receipt.append({
                     "name": p["name"], 
                     "price": p["price"], 
                     "qty": qty, 
-                    "image": clean_img
+                    "image": get_clean_image_url(p.get("image"))
                 })
         
         customer_email = request.form.get("email")
@@ -184,16 +194,12 @@ def checkout():
         send_the_email(order_id, customer_email, total_price, address, city, phone, notes, items_for_receipt)
         session.pop("cart", None)
 
-        return render_template("success.html", 
-                               order_id=order_id, 
-                               total=total_price, 
-                               items=items_for_receipt,
-                               address=f"{address}, {city}",
-                               phone=phone)
+        return render_template("success.html", order_id=order_id, total=total_price, items=items_for_receipt, address=f"{address}, {city}", phone=phone)
     except Exception as e:
         return redirect(url_for('home'))
 
-# --- ADMIN ROUTES (KEEP AS IS) ---
+# --- ADMIN ROUTES ---
+
 @app.route("/admin")
 def admin():
     key = request.args.get('key')
@@ -217,6 +223,47 @@ def add_product():
         "badge": request.form.get("badge"), "category": request.form.get("category")
     })
     return redirect(url_for('admin', key=key))
+
+@app.route("/admin/edit_price/<int:product_id>", methods=["POST"])
+def edit_price(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    new_price = request.form.get("price")
+    if new_price:
+        products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/edit_badge/<int:product_id>", methods=["POST"])
+def edit_badge(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    new_badge = request.form.get("badge")
+    products_col.update_one({"id": product_id}, {"$set": {"badge": new_badge}})
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/delete/<int:product_id>", methods=["POST"])
+def delete_product(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    products_col.delete_one({"id": product_id})
+    return redirect(url_for('admin', key=key))
+
+# --- HELPER ROUTES ---
+
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    pid = str(request.form.get("id"))
+    cart = session.get("cart", [])
+    if pid in cart:
+        cart.remove(pid) 
+        session["cart"] = cart
+        session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    return redirect(url_for('view_cart'))
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
