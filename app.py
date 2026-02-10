@@ -170,14 +170,11 @@ def checkout():
         }
         
         orders_col.insert_one(order_data)
-        
-        # FIX: Sending the correct data to email function
         send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt)
         
         session.pop("cart", None)
         session.modified = True
         
-        # FIX: Passing the entire order_data dictionary so success.html can see everything
         return render_template("success.html", **order_data)
     except Exception as e:
         print(f"Checkout Error: {e}")
@@ -212,6 +209,15 @@ def add_product():
         "price": int(request.form.get("price", 0)), "image": image_url, 
         "badge": request.form.get("badge"), "category": request.form.get("category")
     })
+    return redirect(url_for('admin', key=key))
+
+@app.route("/admin/edit_price/<int:product_id>", methods=["POST"])
+def edit_price(product_id):
+    key = request.args.get('key')
+    if key != ADMIN_PASSWORD: return "Unauthorized", 403
+    new_price = request.form.get("price")
+    if new_price:
+        products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
     return redirect(url_for('admin', key=key))
 
 @app.route("/admin/wipe_orders", methods=["POST"])
