@@ -41,7 +41,8 @@ def get_clean_image_url(img_path):
     else: final_path = clean_path
     return "/" + urllib.parse.quote(final_path)
 
-def send_the_email(order_id, customer_email, total_price, address, phone, items_list, payment_method, proof_url=None):
+# UPDATED: Added customer_name to parameters
+def send_the_email(order_id, customer_email, customer_name, total_price, address, phone, items_list, payment_method, proof_url=None):
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
@@ -63,11 +64,13 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
 
     proof_link_html = f"<p style='color: #00ffff;'><strong>Proof:</strong> <a href='{proof_url}' style='color: #00ffff;'>View Receipt</a></p>" if proof_url else ""
 
+    # UPDATED: Included Customer Name in the HTML body
     email_html = f"""
     <html>
         <body style='background:#000; color:#fff; font-family: sans-serif; padding: 20px;'>
             <h2 style="color: #00ff00;">ORDER CONFIRMED</h2>
             <p>Reference: {order_id}</p>
+            <p><strong>Customer:</strong> {customer_name}</p>
             <p><strong>Payment Method:</strong> {payment_method}</p>
             {proof_link_html}
             <hr style="border: 1px solid #333;">
@@ -83,7 +86,7 @@ def send_the_email(order_id, customer_email, total_price, address, phone, items_
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
-        "subject": f"Receipt: {order_id}",
+        "subject": f"Receipt: {order_id} - {customer_name}",
         "htmlContent": email_html
     }
     try: requests.post(url, json=payload, headers=headers, timeout=15)
@@ -97,7 +100,6 @@ def home():
     all_products = list(products_col.find({}, {'_id': 0}))
     for p in all_products:
         p['image'] = get_clean_image_url(p.get('image'))
-        # Ensure stock defaults to 0 if not present in legacy data
         p['stock'] = p.get('stock', 0)
     cart_count = len(session.get("cart", []))
     return render_template("index.html", products=all_products, cart_count=cart_count)
@@ -106,7 +108,6 @@ def home():
 def add_to_cart():
     try:
         pid = request.form.get("id")
-        # Logic check: Verify stock before adding to cart
         query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
         product = products_col.find_one(query)
         
@@ -145,6 +146,9 @@ def checkout():
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for('home'))
 
+        # NEW: Capture Customer Name from Form
+        customer_name = request.form.get("customer_name")
+
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
@@ -153,7 +157,6 @@ def checkout():
             query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
             p = products_col.find_one(query)
             if p:
-                # --- AUTO-DEDUCT STOCK ---
                 current_stock = p.get('stock', 0)
                 new_stock = max(0, current_stock - qty)
                 products_col.update_one({"id": p['id']}, {"$set": {"stock": new_stock}})
@@ -179,6 +182,7 @@ def checkout():
         
         order_data = {
             "order_id": order_id, 
+            "customer_name": customer_name, # NEW: Save name to order
             "email": request.form.get("email"),
             "phone": request.form.get("phone"),
             "address": full_address,
@@ -190,7 +194,19 @@ def checkout():
         }
         
         orders_col.insert_one(order_data)
-        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt, payment_choice, proof_url)
+        
+        # UPDATED: Pass customer_name to the email function
+        send_the_email(
+            order_id, 
+            order_data['email'], 
+            customer_name, 
+            total_price, 
+            full_address, 
+            order_data['phone'], 
+            items_for_receipt, 
+            payment_choice, 
+            proof_url
+        )
         
         session.pop("cart", None)
         session.modified = True
@@ -212,7 +228,7 @@ def admin():
         for p in all_products:
             p['_id'] = str(p['_id'])
             p['image'] = get_clean_image_url(p.get('image'))
-            p['stock'] = p.get('stock', 0) # Ensure admin sees stock
+            p['stock'] = p.get('stock', 0)
         for o in all_orders:
             o['_id'] = str(o['_id'])
         return render_template("admin.html", products=all_products, orders=all_orders, admin_key=key)
@@ -226,12 +242,11 @@ def add_product():
     file = request.files.get("photo")
     image_url = cloudinary.uploader.upload(file)['secure_url'] if file else "https://via.placeholder.com/500"
     
-    # Updated to capture stock from form
     products_col.insert_one({
         "id": int(time.time()), 
         "name": request.form.get("name"),
         "price": int(request.form.get("price", 0)), 
-        "stock": int(request.form.get("stock", 0)), # Stock capture
+        "stock": int(request.form.get("stock", 0)),
         "image": image_url, 
         "badge": request.form.get("badge"), 
         "category": request.form.get("category")
@@ -242,7 +257,7 @@ def add_product():
 def edit_price(product_id):
     key = request.args.get('key')
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    new_price = request.form.get("new_price") # Matches admin.html input name
+    new_price = request.form.get("new_price")
     if new_price:
         products_col.update_one({"id": product_id}, {"$set": {"price": int(new_price)}})
     return redirect(url_for('admin', key=key))
