@@ -128,7 +128,7 @@ def view_cart():
         p = products_col.find_one(query, {'_id': 0})
         if p:
             item = p.copy()
-            # FIX: Mapping the cleaned URL so the <img> tag in cart.html works
+            # UPDATED: Using exact standardization logic as shop home page
             item['image'] = get_clean_image_url(item.get('image'))
             item['quantity'] = qty
             cart_items.append(item)
@@ -176,7 +176,6 @@ def checkout():
         session.pop("cart", None)
         session.modified = True
         
-        # FIX: Ensure order_data is passed so success.html isn't empty
         return render_template("success.html", **order_data)
     except Exception as e:
         print(f"Checkout Error: {e}")
