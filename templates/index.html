@@ -58,7 +58,7 @@
   <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-white text-black px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 w-[90%] md:w-auto justify-between md:justify-start">
       <span class="text-[10px] font-black uppercase tracking-[0.2em]">Added to Cart</span>
       <div class="h-4 w-[1px] bg-black/10 hidden md:block"></div>
-      <a href="/cart" class="text-[10px] font-bold uppercase underline">View Cart</a>
+      <button onclick="toggleModal('checkoutModal')" class="text-[10px] font-bold uppercase underline">View Cart & Checkout</button>
   </div>
 
   <div class="bg-white text-black py-2 overflow-hidden whitespace-nowrap border-b border-white/10">
@@ -79,12 +79,12 @@
     </a>
 
     <div class="flex md:hidden items-center gap-4">
-        <a href="/cart" class="relative p-2">
+        <button onclick="toggleModal('checkoutModal')" class="relative p-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
             <span class="cart-badge absolute top-0 right-0 bg-white text-black text-[8px] font-bold h-4 w-4 flex items-center justify-center rounded-full">{{ cart_count if cart_count else 0 }}</span>
-        </a>
+        </button>
     </div>
 
     <div class="hidden md:flex items-center gap-10 text-[11px] uppercase tracking-widest font-medium">
@@ -97,7 +97,7 @@
           </div>
         </div>
       </div>
-      <a href="/cart" class="group flex items-center gap-2">Cart <span class="cart-badge bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></a>
+      <button onclick="toggleModal('checkoutModal')" class="group flex items-center gap-2">Cart <span class="cart-badge bg-white text-black px-1.5 py-0.5 rounded-full text-[9px]">{{ cart_count if cart_count else 0 }}</span></button>
     </div>
   </nav>
 
@@ -157,6 +157,64 @@
     </div>
   </div>
 
+  <div id="checkoutModal" class="fixed inset-0 z-[150] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/98" onclick="toggleModal('checkoutModal')"></div>
+    <div class="relative bg-[#0F0F0F] border border-white/10 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center sticky top-0 bg-[#0F0F0F] z-10">
+            <h2 class="text-sm font-black uppercase tracking-widest">Secure Checkout</h2>
+            <button onclick="toggleModal('checkoutModal')" class="text-gray-500 hover:text-white">✕</button>
+        </div>
+
+        <form action="/checkout" method="POST" enctype="multipart/form-data" class="p-6 md:p-8 space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <label class="cursor-pointer">
+                    <input type="radio" name="payment_method" value="COD" class="hidden peer" checked onchange="togglePaymentView('COD')">
+                    <div class="text-center p-4 border border-white/10 rounded-xl peer-checked:border-white peer-checked:bg-white peer-checked:text-black transition-all">
+                        <p class="text-[10px] font-black uppercase tracking-widest">COD</p>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="payment_method" value="GCash / Instant Pay" class="hidden peer" onchange="togglePaymentView('GCash')">
+                    <div class="text-center p-4 border border-white/10 rounded-xl peer-checked:border-cyan-400 peer-checked:bg-cyan-400 peer-checked:text-white transition-all">
+                        <p class="text-[10px] font-black uppercase tracking-widest">GCash</p>
+                    </div>
+                </label>
+            </div>
+
+            <div id="gcash-qr-area" class="hidden animate-fadeIn space-y-6 text-center">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-cyan-400 font-bold">Official Merchant QR</p>
+                <div class="inline-block p-3 bg-white rounded-3xl shadow-xl">
+                    <img src="{{ url_for('static', filename='images/official_gcash_qr.png') }}" alt="GCash QR" class="w-48 h-48">
+                </div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                    <p class="text-[9px] text-gray-500 uppercase">Account Name</p>
+                    <p class="text-xs font-black text-white">RCAPS4STREET ADMIN</p>
+                </div>
+                
+                <div class="text-left space-y-2">
+                    <label class="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Upload Screenshot of Receipt</label>
+                    <input type="file" name="payment_proof" id="receipt-upload" accept="image/*"
+                           class="block w-full text-[10px] text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white file:text-black font-bold cursor-pointer">
+                </div>
+            </div>
+
+            <div class="space-y-4 pt-4 border-t border-white/5">
+                <div>
+                    <label class="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Delivery Details</label>
+                    <input type="text" name="name" placeholder="Full Name" required class="w-full bg-black border border-white/10 p-4 mt-2 rounded-xl text-xs outline-none focus:border-white transition">
+                </div>
+                <input type="email" name="email" placeholder="Email Address" required class="w-full bg-black border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-white transition">
+                <input type="text" name="phone" placeholder="Phone Number" required class="w-full bg-black border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-white transition">
+                <textarea name="address" placeholder="Complete Shipping Address" required class="w-full bg-black border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-white transition h-24"></textarea>
+            </div>
+
+            <button type="submit" class="w-full bg-white text-black py-5 rounded-xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-gray-200 transition-all shadow-lg shadow-white/5">
+                Complete Order
+            </button>
+        </form>
+    </div>
+  </div>
+
   <script>
     function toggleModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -165,32 +223,36 @@
         document.body.style.overflow = modal.classList.contains('modal-active') ? 'hidden' : 'auto';
     }
 
-    function quickAdd(productId) {
-        console.log("Attempting to add Product ID:", productId);
+    // Toggle Payment UI
+    function togglePaymentView(method) {
+        const qrArea = document.getElementById('gcash-qr-area');
+        const receiptInput = document.getElementById('receipt-upload');
         
+        if (method === 'GCash') {
+            qrArea.classList.remove('hidden');
+            receiptInput.required = true;
+        } else {
+            qrArea.classList.add('hidden');
+            receiptInput.required = false;
+        }
+    }
+
+    function quickAdd(productId) {
         const formData = new FormData();
         formData.append('id', productId);
 
-        // Using an absolute path to avoid 404 issues
         fetch(window.location.origin + '/add-to-cart', {
             method: 'POST',
             body: formData
         })
         .then(response => {
-            if (response.status === 404) {
-                throw new Error("The cart route was not found on the server. Please check app.py.");
-            }
-            if (!response.ok) {
-                return response.text().then(text => { throw new Error(text || 'Server Error') });
-            }
+            if (!response.ok) throw new Error('Server Error');
             return response.json();
         })
         .then(data => {
             if (data.status === 'success') {
                 const badges = document.querySelectorAll('.cart-badge');
-                badges.forEach(badge => {
-                    badge.innerText = data.cart_count;
-                });
+                badges.forEach(badge => { badge.innerText = data.cart_count; });
                 const toast = document.getElementById('toast');
                 toast.classList.add('show');
                 setTimeout(() => { toast.classList.remove('show'); }, 3000);
@@ -198,7 +260,6 @@
         })
         .catch(error => {
             console.error('Fetch error:', error);
-            alert("Error: " + error.message);
         });
     }
   </script>
