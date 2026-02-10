@@ -118,11 +118,9 @@
     
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-10">
       {% for product in products %}
-        {% if loop.index <= 6 %}
         <div class="group flex flex-col">
           <div class="relative overflow-hidden bg-[#111] aspect-[4/5] flex items-center justify-center rounded-lg">
             <img src="{{ product.image }}" class="w-3/4 transition duration-700 group-hover:scale-110">
-            
             <div class="hidden md:block absolute bottom-4 left-4 right-4 translate-y-12 group-hover:translate-y-0 transition duration-500 opacity-0 group-hover:opacity-100">
                  <button onclick="quickAdd('{{ product.id }}')" class="w-full bg-white text-black py-3 text-[10px] uppercase font-bold">Quick Add +</button>
             </div>
@@ -135,7 +133,6 @@
             <button onclick="quickAdd('{{ product.id }}')" class="md:hidden w-full bg-white/10 border border-white/20 py-2 text-[9px] uppercase font-bold rounded">Add To Cart</button>
           </div>
         </div>
-        {% endif %}
       {% endfor %}
     </div>
   </section>
@@ -174,38 +171,34 @@
         const formData = new FormData();
         formData.append('id', productId);
 
-        fetch('/add-to-cart', {
+        // Using an absolute path to avoid 404 issues
+        fetch(window.location.origin + '/add-to-cart', {
             method: 'POST',
             body: formData
         })
         .then(response => {
-            console.log("Server Response Status:", response.status);
+            if (response.status === 404) {
+                throw new Error("The cart route was not found on the server. Please check app.py.");
+            }
             if (!response.ok) {
                 return response.text().then(text => { throw new Error(text || 'Server Error') });
             }
             return response.json();
         })
         .then(data => {
-            console.log("Success Data:", data);
-            
             if (data.status === 'success') {
-                // Find all elements with the class 'cart-badge'
                 const badges = document.querySelectorAll('.cart-badge');
                 badges.forEach(badge => {
                     badge.innerText = data.cart_count;
                 });
-
-                // Show Toast
                 const toast = document.getElementById('toast');
                 toast.classList.add('show');
                 setTimeout(() => { toast.classList.remove('show'); }, 3000);
-            } else {
-                console.error("Server returned success:false", data);
             }
         })
         .catch(error => {
-            console.error('Full Error Object:', error);
-            alert("Cart Error: " + error.message);
+            console.error('Fetch error:', error);
+            alert("Error: " + error.message);
         });
     }
   </script>
