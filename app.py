@@ -93,7 +93,6 @@ def view_cart():
     
     for pid, qty in counts.items():
         try:
-            # Flexible ID lookup to catch both string and int types in DB
             query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
             p = products_col.find_one(query, {'_id': 0})
             
@@ -101,7 +100,7 @@ def view_cart():
                 item = p.copy()
                 img = item.get('image', '')
 
-                # --- FIX: Safe URL encoding for filenames with ' or spaces ---
+                # --- FIX: URL encoding for filenames with ' or spaces ---
                 if not img:
                     item['image'] = 'https://via.placeholder.com/150'
                 elif img.startswith('http'):
@@ -113,11 +112,12 @@ def view_cart():
                         final_path = f"static/{folder}{clean_path}"
                     else:
                         final_path = clean_path
-                    
-                    # Convert ' to %27 so the browser finds the file
                     item['image'] = "/" + urllib.parse.quote(final_path)
 
+                # --- FIX: Added 'quantity' to prevent Jinja2 UndefinedError ---
                 item['qty'] = qty
+                item['quantity'] = qty 
+                
                 cart_items.append(item)
                 total_price += p["price"] * qty
         except: continue
