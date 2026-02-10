@@ -151,7 +151,12 @@
                         <p class="text-[10px] font-black text-white tracking-widest">{{ order.order_id }}</p>
                         <p class="text-[8px] text-gray-500 uppercase">{{ order.date }}</p>
                     </div>
-                    <p class="text-sm font-black">₱{{ order.total }}</p>
+                    <div class="text-right">
+                        <p class="text-[9px] font-black uppercase tracking-widest {% if order.payment_method == 'GCash / Instant Pay' %}text-cyan-400{% else %}text-green-500{% endif %}">
+                            {{ order.payment_method or 'COD' }}
+                        </p>
+                        <p class="text-sm font-black">₱{{ order.total }}</p>
+                    </div>
                 </div>
                 
                 <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -160,7 +165,18 @@
                         <p><span class="text-gray-600">EMAIL:</span> {{ order.email or 'N/A' }}</p>
                         <p><span class="text-gray-600">PHONE:</span> <span class="text-white">{{ order.phone or 'N/A' }}</span></p>
                         <p><span class="text-gray-600">ADDR:</span> {{ order.address or 'N/A' }}, {{ order.city or '' }}</p>
+                        
+                        {% if order.payment_proof %}
+                        <div class="pt-3">
+                            <a href="{{ order.payment_proof }}" target="_blank" 
+                               class="inline-flex items-center bg-cyan-600 hover:bg-cyan-500 text-white text-[8px] font-black py-2 px-4 rounded-lg tracking-[0.2em] transition-all shadow-lg shadow-cyan-500/20">
+                                <svg class="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                VIEW GCASH RECEIPT
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
+
                     <div class="text-[10px] space-y-2">
                         <p class="text-gray-500 uppercase tracking-widest font-bold">Manifest & Notes</p>
                         <p class="text-white italic">"{{ order.description or 'No extra instructions.' }}"</p>
@@ -168,7 +184,7 @@
                             {% if order.items and order.items is iterable %}
                                 {% for item in order.items %}
                                 <span class="bg-white/5 border border-white/10 px-2 py-1 rounded text-[8px] font-bold">
-                                    {{ item.name }} (x{{ item.qty }})
+                                    {{ item.name }} (x{{ item.qty or item.quantity }})
                                 </span>
                                 {% endfor %}
                             {% else %}
