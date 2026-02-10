@@ -9,12 +9,10 @@ import cloudinary
 import cloudinary.uploader
 
 app = Flask(__name__)
-# The secret key encrypts the session cookie
 app.secret_key = os.environ.get("SECRET_KEY", "rcaps4street_dev_key_123")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "STREET_BOSS_2026") 
 
 # --- CLOUDINARY CONFIG ---
-# Add these to your Render Environment Variables
 cloudinary.config( 
   cloud_name = os.environ.get("CLOUDINARY_NAME"), 
   api_key = os.environ.get("CLOUDINARY_API_KEY"), 
@@ -37,7 +35,10 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
-    items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}" for item in items_list])
+    
+    # Updated to include product name, qty, price, and a direct link to the image for the customer
+    items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}\n  Image: {item['image']}" for item in items_list])
+    
     email_body = (
         f"Order Confirmation: {order_id}\n"
         f"-----------------------------------\n"
@@ -60,7 +61,7 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         "textContent": email_body
     }
     try: requests.post(url, json=payload, headers=headers, timeout=15)
-    except: pass
+    except Exception as e: print(f"Email Error: {e}")
 
 # --- SHOP ROUTES ---
 
@@ -82,52 +83,33 @@ def view_cart():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
             if p:
                 item = p.copy()
-                item['quantity'] = qty
+                item['qty'] = qty # Syncing variable names to 'qty'
                 cart_items.append(item)
                 total_price += p["price"] * qty
         except: continue
     return render_template("cart.html", cart=cart_items, total_price=total_price)
-
-@app.route("/add-to-cart", methods=["POST"])
-def add_to_cart():
-    if "cart" not in session: session["cart"] = []
-    product_id = request.form.get("id")
-    if product_id:
-        cart = session["cart"]
-        cart.append(str(product_id))
-        session["cart"] = cart
-        session.modified = True
-    return jsonify({"status": "success", "cart_count": len(session["cart"])})
-
-@app.route("/remove-from-cart", methods=["POST"])
-def remove_from_cart():
-    product_id = request.form.get("product_id")
-    if "cart" in session:
-        cart = session["cart"]
-        if str(product_id) in cart:
-            cart.remove(str(product_id))
-            session["cart"] = cart
-            session.modified = True
-    return redirect(url_for('view_cart'))
-
-@app.route("/empty-cart", methods=["POST"])
-def empty_cart():
-    session.pop("cart", None)
-    return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
     try:
         cart_ids = session.get("cart", [])
         if not cart_ids: return redirect(url_for("home"))
+        
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
+        
         for pid, qty in counts.items():
             p = products_col.find_one({"id": int(pid)}, {'_id': 0})
             if p:
                 total_price += p["price"] * qty
-                items_for_receipt.append({"name": p["name"], "price": p["price"], "qty": qty})
+                # FIX: Adding 'image' to the list so success.html and email can see it
+                items_for_receipt.append({
+                    "name": p["name"], 
+                    "price": p["price"], 
+                    "qty": qty,
+                    "image": p.get("image", "")
+                })
         
         customer_email = request.form.get("email")
         phone = request.form.get("phone", "N/A")
@@ -142,9 +124,18 @@ def checkout():
             "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
+
         send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_for_receipt)
+        
         session.pop("cart", None)
-        return render_template("success.html", order_id=order_id, total=total_price, email=customer_email)
+        # FIX: Passing address, city, and items to the success page
+        return render_template("success.html", 
+                               order_id=order_id, 
+                               total=total_price, 
+                               email=customer_email,
+                               address=address,
+                               city=city,
+                               items=items_for_receipt)
     except Exception as e:
         print(f"Checkout Error: {e}")
         return redirect(url_for('home'))
@@ -165,10 +156,9 @@ def add_product():
     if key != ADMIN_PASSWORD: return "Unauthorized", 403
     
     file = request.files.get("photo")
-    image_url = "https://via.placeholder.com/500" # Fallback
+    image_url = "https://via.placeholder.com/500" 
     
     if file:
-        # Upload directly to Cloudinary
         upload_result = cloudinary.uploader.upload(file)
         image_url = upload_result['secure_url']
     
@@ -176,7 +166,7 @@ def add_product():
         "id": int(time.time()), 
         "name": request.form.get("name"),
         "price": int(request.form.get("price", 0)),
-        "image": image_url, # Now storing the permanent Cloudinary Link
+        "image": image_url, 
         "badge": request.form.get("badge"),
         "category": request.form.get("category")
     })
