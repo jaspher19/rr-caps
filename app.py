@@ -39,24 +39,69 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
     
-    items_text = "\n".join([f"- {item['name']} (x{item['qty']}): ₱{item['price'] * item['qty']}" for item in items_list])
-    
-    email_body = (
-        f"Order Confirmation: {order_id}\n"
-        f"-----------------------------------\n"
-        f"Total: ₱{total_price}\n"
-        f"Address: {address}, {city}\n"
-        f"Phone: {phone}\n\n"
-        f"Items Ordered:\n{items_text}\n\n"
-        f"Thank you for shopping with RCAPS4STREETS!"
-    )
+    # Building Aesthetic HTML Table for Items
+    items_html = ""
+    for item in items_list:
+        items_html += f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee;">{item['name']}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: center;">x{item['qty']}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #eee; text-align: right;">₱{item['price'] * item['qty']}</td>
+        </tr>
+        """
+
+    # Aesthetic HTML Body with Website Theme
+    email_html = f"""
+    <html>
+    <body style="background-color: #000; color: #ffffff; font-family: 'Arial', sans-serif; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: #111; padding: 30px; border-radius: 10px; border: 1px solid #222;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #2ecc71; margin: 0; letter-spacing: 2px;">ORDER CONFIRMED</h1>
+                <p style="color: #888;">Order ID: {order_id}</p>
+            </div>
+            
+            <p style="font-size: 16px;">Thank you for your purchase! Here is your receipt from <strong>RCAPS4STREETS</strong>.</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <thead>
+                    <tr style="background: #222; color: #2ecc71;">
+                        <th style="padding: 10px; text-align: left;">Item</th>
+                        <th style="padding: 10px; text-align: center;">Qty</th>
+                        <th style="padding: 10px; text-align: right;">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
+
+            <div style="text-align: right; font-size: 20px; color: #2ecc71; margin-top: 10px;">
+                <strong>TOTAL: ₱{total_price}</strong>
+            </div>
+
+            <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; color: #ccc;">
+                <h3 style="color: #fff; margin-bottom: 10px;">Shipping Details</h3>
+                <p style="margin: 5px 0;"><strong>Phone:</strong> {phone}</p>
+                <p style="margin: 5px 0;"><strong>Address:</strong> {address}, {city}</p>
+                <p style="margin: 5px 0; font-style: italic; color: #888;">{description}</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #555;">
+                <p>© 2026 RCAPS4STREETS. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
         "bcc": [{"email": MAIL_USER}], 
-        "subject": f"Order Received - {order_id}",
-        "textContent": email_body
+        "subject": f"Receipt: {order_id} - RCAPS4STREETS",
+        "htmlContent": email_html # Use htmlContent instead of textContent
     }
+    
     try: 
         requests.post(url, json=payload, headers=headers, timeout=15)
     except Exception as e: 
@@ -95,12 +140,9 @@ def view_cart():
         try:
             query = {"id": int(pid)} if pid.isdigit() else {"id": pid}
             p = products_col.find_one(query, {'_id': 0})
-            
             if p:
                 item = p.copy()
                 img = item.get('image', '')
-
-                # --- FIX: URL encoding for filenames with ' or spaces ---
                 if not img:
                     item['image'] = 'https://via.placeholder.com/150'
                 elif img.startswith('http'):
@@ -114,30 +156,12 @@ def view_cart():
                         final_path = clean_path
                     item['image'] = "/" + urllib.parse.quote(final_path)
 
-                # --- FIX: Added 'quantity' to prevent Jinja2 UndefinedError ---
                 item['qty'] = qty
                 item['quantity'] = qty 
-                
                 cart_items.append(item)
                 total_price += p["price"] * qty
         except: continue
-            
     return render_template("cart.html", cart=cart_items, total_price=total_price)
-
-@app.route("/remove-from-cart", methods=["POST"])
-def remove_from_cart():
-    pid = str(request.form.get("id"))
-    cart = session.get("cart", [])
-    if pid in cart:
-        cart.remove(pid) 
-        session["cart"] = cart
-        session.modified = True
-    return redirect(url_for('view_cart'))
-
-@app.route("/empty-cart", methods=["POST"])
-def empty_cart():
-    session.pop("cart", None)
-    return redirect(url_for('view_cart'))
 
 @app.route("/checkout", methods=["POST"])
 def checkout():
@@ -156,21 +180,51 @@ def checkout():
                 total_price += p["price"] * qty
                 items_for_receipt.append({"name": p["name"], "price": p["price"], "qty": qty})
         
+        # Capture form data
+        customer_email = request.form.get("email")
+        phone = request.form.get("phone")
+        address = request.form.get("address")
+        city = request.form.get("city")
+        notes = request.form.get("description", "No additional notes.")
+        
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
         orders_col.insert_one({
-            "order_id": order_id, "email": request.form.get("email"), 
+            "order_id": order_id, "email": customer_email, 
+            "phone": phone, "address": address, "city": city,
             "items": items_for_receipt, "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y")
         })
 
-        send_the_email(order_id, request.form.get("email"), total_price, 
-                       request.form.get("address"), request.form.get("city"), 
-                       request.form.get("phone"), "", items_for_receipt)
+        # Send HTML receipt
+        send_the_email(order_id, customer_email, total_price, address, city, phone, notes, items_for_receipt)
         
         session.pop("cart", None)
-        return render_template("success.html", order_id=order_id, total=total_price)
-    except:
+        # Pass captured data to success page to make them visible
+        return render_template("success.html", 
+                               order_id=order_id, 
+                               total=total_price, 
+                               items=items_for_receipt,
+                               address=f"{address}, {city}",
+                               phone=phone)
+    except Exception as e:
+        print(f"Checkout error: {e}")
         return redirect(url_for('home'))
+
+# --- ADMIN & HELPER ROUTES ---
+@app.route("/remove-from-cart", methods=["POST"])
+def remove_from_cart():
+    pid = str(request.form.get("id"))
+    cart = session.get("cart", [])
+    if pid in cart:
+        cart.remove(pid) 
+        session["cart"] = cart
+        session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    return redirect(url_for('view_cart'))
 
 @app.route("/admin")
 def admin():
@@ -189,19 +243,11 @@ def add_product():
     if file:
         res = cloudinary.uploader.upload(file)
         image_url = res['secure_url']
-    
     products_col.insert_one({
         "id": int(time.time()), "name": request.form.get("name"),
         "price": int(request.form.get("price", 0)), "image": image_url, 
         "badge": request.form.get("badge"), "category": request.form.get("category")
     })
-    return redirect(url_for('admin', key=key))
-
-@app.route("/admin/delete/<int:product_id>", methods=["POST"])
-def delete_product(product_id):
-    key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
 if __name__ == "__main__":
