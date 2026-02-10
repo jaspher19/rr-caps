@@ -47,7 +47,7 @@ def get_clean_image_url(img_path):
     
     return "/" + urllib.parse.quote(final_path)
 
-def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
+def send_the_email(order_id, customer_email, total_price, address, phone, items_list):
     if not BREVO_API_KEY: return
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {"accept": "application/json", "content-type": "application/json", "api-key": BREVO_API_KEY}
@@ -55,7 +55,6 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
     items_html = ""
     for item in items_list:
         img_src = item.get('image', 'https://via.placeholder.com/50')
-        # Using 'quantity' to match the updated dictionary keys
         qty = item.get('quantity', 1)
         items_html += f"""
         <tr>
@@ -68,7 +67,22 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         </tr>
         """
 
-    email_html = f"<html><body style='background:#000; color:#fff;'>Order: {order_id} Details: {items_html} </body></html>"
+    email_html = f"""
+    <html>
+        <body style='background:#000; color:#fff; font-family: sans-serif; padding: 20px;'>
+            <h2 style="color: #00ff00;">ORDER CONFIRMED</h2>
+            <p>Reference: {order_id}</p>
+            <hr style="border: 1px solid #333;">
+            <table width="100%" style="color: #eee;">
+                {items_html}
+            </table>
+            <p><strong>Total Paid: ₱{total_price}</strong></p>
+            <p><strong>Shipping to:</strong> {address}</p>
+            <p><strong>Phone:</strong> {phone}</p>
+        </body>
+    </html>
+    """
+    
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
@@ -107,7 +121,6 @@ def view_cart():
     cart_ids = session.get("cart", [])
     cart_items = []
     total_price = 0
-    # Grouping IDs and counting them
     counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
     
     for pid, qty in counts.items():
@@ -116,7 +129,6 @@ def view_cart():
         if p:
             item = p.copy()
             item['image'] = get_clean_image_url(item.get('image'))
-            # CRITICAL FIX: Named 'quantity' to match cart.html template
             item['quantity'] = qty
             cart_items.append(item)
             total_price += p["price"] * qty
@@ -126,6 +138,8 @@ def view_cart():
 def checkout():
     try:
         cart_ids = session.get("cart", [])
+        if not cart_ids: return redirect(url_for('home'))
+
         items_for_receipt = []
         total_price = 0
         counts = {str(cid): cart_ids.count(str(cid)) for cid in set(cart_ids)}
@@ -138,26 +152,36 @@ def checkout():
                 items_for_receipt.append({
                     "name": p["name"], 
                     "price": p["price"], 
-                    "quantity": qty, # Consistent naming
+                    "quantity": qty,
                     "image": get_clean_image_url(p.get("image"))
                 })
         
+        full_address = f"{request.form.get('address')}, {request.form.get('city')}"
         order_id = f"RCAPS-{random.randint(1000, 9999)}"
+        
         order_data = {
             "order_id": order_id, 
             "email": request.form.get("email"),
+            "phone": request.form.get("phone"),
+            "address": full_address,
             "total": total_price, 
             "date": datetime.now().strftime("%b %d, %Y"), 
             "items": items_for_receipt
         }
+        
         orders_col.insert_one(order_data)
         
-        # Email customer
-        send_the_email(order_id, order_data['email'], total_price, "", "", "", "", items_for_receipt)
+        # FIX: Sending the correct data to email function
+        send_the_email(order_id, order_data['email'], total_price, full_address, order_data['phone'], items_for_receipt)
         
         session.pop("cart", None)
-        return render_template("success.html", order_id=order_id, total=total_price)
-    except: return redirect(url_for('home'))
+        session.modified = True
+        
+        # FIX: Passing the entire order_data dictionary so success.html can see everything
+        return render_template("success.html", **order_data)
+    except Exception as e:
+        print(f"Checkout Error: {e}")
+        return redirect(url_for('home'))
 
 # --- ADMIN ROUTES ---
 
