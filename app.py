@@ -32,18 +32,12 @@ MAIL_USER = os.environ.get('MAIL_USERNAME', 'ultrainstinct1596321@gmail.com')
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 
 def get_clean_image_url(img_path):
-    """
-    Forces absolute paths and URL encoding to fix broken images 
-    on the cart and admin pages.
-    """
+    """Standardizes image paths to fix broken links in Cart and Shop."""
     if not img_path:
         return 'https://via.placeholder.com/150'
-    
-    # If it's already a full Cloudinary link, use it
     if img_path.startswith('http'):
         return img_path
     
-    # Clean slashes and ensure it's pointing to static
     clean_path = img_path.lstrip('/')
     if not clean_path.startswith('static/'):
         folder = "images/" if not clean_path.startswith('images/') else ""
@@ -51,7 +45,6 @@ def get_clean_image_url(img_path):
     else:
         final_path = clean_path
     
-    # URL Encode to handle spaces (e.g., "Red Cap.jpg" -> "Red%20Cap.jpg")
     return "/" + urllib.parse.quote(final_path)
 
 def send_the_email(order_id, customer_email, total_price, address, city, phone, description, items_list):
@@ -73,7 +66,7 @@ def send_the_email(order_id, customer_email, total_price, address, city, phone, 
         </tr>
         """
 
-    email_html = f"<html><body style='background:#000; color:#fff;'>... (Order: {order_id} Details) ... {items_html} </body></html>"
+    email_html = f"<html><body style='background:#000; color:#fff;'>Order: {order_id} Details: {items_html} </body></html>"
     payload = {
         "sender": {"name": "RCAPS4STREETS", "email": MAIL_USER},
         "to": [{"email": customer_email}],
@@ -119,7 +112,7 @@ def view_cart():
         p = products_col.find_one(query, {'_id': 0})
         if p:
             item = p.copy()
-            item['image'] = get_clean_image_url(item.get('image')) # Absolute path fix
+            item['image'] = get_clean_image_url(item.get('image'))
             item['qty'] = qty
             cart_items.append(item)
             total_price += p["price"] * qty
@@ -143,19 +136,13 @@ def checkout():
                     "image": get_clean_image_url(p.get("image"))
                 })
         
-        order_data = {
-            "order_id": f"RCAPS-{random.randint(1000, 9999)}",
-            "email": request.form.get("email"),
-            "phone": request.form.get("phone"),
-            "address": f"{request.form.get('address')}, {request.form.get('city')}",
-            "items": items_for_receipt,
-            "total": total_price,
-            "date": datetime.now().strftime("%b %d, %Y")
-        }
-        orders_col.insert_one(order_data)
-        send_the_email(order_data['order_id'], order_data['email'], total_price, request.form.get('address'), request.form.get('city'), order_data['phone'], "", items_for_receipt)
+        order_id = f"RCAPS-{random.randint(1000, 9999)}"
+        orders_col.insert_one({
+            "order_id": order_id, "email": request.form.get("email"),
+            "total": total_price, "date": datetime.now().strftime("%b %d, %Y"), "items": items_for_receipt
+        })
         session.pop("cart", None)
-        return render_template("success.html", **order_data)
+        return render_template("success.html", order_id=order_id, total=total_price)
     except: return redirect(url_for('home'))
 
 # --- ADMIN ROUTES ---
@@ -189,13 +176,6 @@ def add_product():
     })
     return redirect(url_for('admin', key=key))
 
-@app.route("/admin/edit_price/<int:product_id>", methods=["POST"])
-def edit_price(product_id):
-    key = request.args.get('key')
-    if key != ADMIN_PASSWORD: return "Unauthorized", 403
-    products_col.update_one({"id": product_id}, {"$set": {"price": int(request.form.get("price"))}})
-    return redirect(url_for('admin', key=key))
-
 @app.route("/admin/wipe_orders", methods=["POST"])
 def wipe_orders():
     key = request.args.get('key')
@@ -210,6 +190,8 @@ def delete_product(product_id):
     products_col.delete_one({"id": product_id})
     return redirect(url_for('admin', key=key))
 
+# --- HELPER ROUTES ---
+
 @app.route("/remove-from-cart", methods=["POST"])
 def remove_from_cart():
     pid = str(request.form.get("id"))
@@ -217,6 +199,13 @@ def remove_from_cart():
     if pid in cart:
         cart.remove(pid)
         session["cart"] = cart
+        session.modified = True
+    return redirect(url_for('view_cart'))
+
+@app.route("/empty-cart", methods=["POST"])
+def empty_cart():
+    session.pop("cart", None)
+    session.modified = True
     return redirect(url_for('view_cart'))
 
 if __name__ == "__main__":
