@@ -22,18 +22,24 @@
     
     .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); }
     
-    /* NEW: Neon Lettering Styles */
     .neon-glow {
         color: #fff;
-        text-shadow: 
-            0 0 10px rgba(255,255,255,0.8),
-            0 0 20px rgba(0, 255, 170, 0.5),
-            0 0 40px rgba(0, 255, 170, 0.3);
+        text-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(0, 255, 170, 0.5), 0 0 40px rgba(0, 255, 170, 0.3);
     }
 
     .text-pop {
-        color: #FFD700; /* Gold/Yellow */
+        color: #FFD700;
         text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+    }
+
+    /* Social Icon Glow */
+    .social-link {
+        transition: all 0.3s ease;
+    }
+    .social-link:hover {
+        color: #0fa;
+        filter: drop-shadow(0 0 8px rgba(0, 255, 170, 0.8));
+        transform: translateY(-2px);
     }
 
     .text-outline { -webkit-text-stroke: 1px white; }
@@ -81,6 +87,18 @@
 </head>
 
 <body class="text-white overflow-x-hidden">
+
+  <div class="fixed left-6 top-1/2 -translate-y-1/2 z-[100] hidden md:flex flex-col gap-8 p-4 glass rounded-full border border-white/10">
+    <a href="https://www.instagram.com/rcaps4street?igsh=MWd5dXUzMWllMXd3bg%3D%3D&utm_source=qr" target="_blank" class="social-link">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+    </a>
+    <a href="https://www.facebook.com/share/1AZtjPgeEo/?mibextid=wwXIfr" target="_blank" class="social-link">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
+    </a>
+    <a href="https://www.tiktok.com/@rcaps4street" target="_blank" class="social-link">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.08 2.7 1.51 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.03 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.9-.32-1.98-.23-2.84.2-.8.4-1.42 1.13-1.67 1.98-.26.91-.12 1.92.41 2.68.61.9 1.66 1.47 2.74 1.49 1.1.03 2.2-.47 2.87-1.34.4-.52.59-1.16.6-1.81-.02-3.89-.02-7.78-.02-11.67z"/></svg>
+    </a>
+  </div>
 
   <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-white text-black px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 w-[90%] md:w-auto justify-between md:justify-start">
       <span id="toast-msg" class="text-[10px] font-black uppercase tracking-[0.2em]">Added to Cart</span>
@@ -188,6 +206,21 @@
       {% endfor %}
     </div>
   </section>
+
+  <footer class="py-16 border-t border-white/5 bg-black/60 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <div class="flex justify-center gap-8 mb-8 md:hidden">
+        <a href="https://www.instagram.com/rcaps4street?igsh=MWd5dXUzMWllMXd3bg%3D%3D&utm_source=qr" target="_blank" class="social-link uppercase text-[10px] font-bold tracking-widest">Instagram</a>
+        <a href="https://www.facebook.com/share/1AZtjPgeEo/?mibextid=wwXIfr" target="_blank" class="social-link uppercase text-[10px] font-bold tracking-widest">Facebook</a>
+        <a href="https://www.tiktok.com/@rcaps4street" target="_blank" class="social-link uppercase text-[10px] font-bold tracking-widest">TikTok</a>
+      </div>
+      <h2 class="text-xl font-black uppercase tracking-tighter mb-2">RCaps4Street</h2>
+      <p class="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-8">Est. 2023 | Manila, Philippines</p>
+      <div class="text-[8px] text-gray-700 uppercase tracking-widest">
+        &copy; 2026 RCAPS4STREET. All Rights Reserved.
+      </div>
+    </div>
+  </footer>
 
   <div id="allListingsModal" class="fixed inset-0 z-[100] hidden items-center justify-center p-2 md:p-10">
     <div class="absolute inset-0 bg-black/95" onclick="toggleModal('allListingsModal')"></div>
